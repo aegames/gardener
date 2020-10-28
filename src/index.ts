@@ -120,6 +120,37 @@ async function roleChanged(role: Role) {
   checkReadyToPlay(role.guild);
 }
 
+function placeCharacter(
+  guild: Guild,
+  channel: GuildChannel,
+  frameRole: Role,
+  innerRole: Role
+) {
+  if (frameRole.members.size === 0) {
+    console.warn(`No player for ${frameRole.name}`);
+  }
+
+  const promises = flatMap(frameRole.members.array(), (member) => {
+    const extraRoles = member.roles.cache.filter(
+      (role) =>
+        innerCharacterNames.includes(role.name) && role.name !== innerRole.name
+    );
+
+    console.log(
+      `Giving ${member.displayName} ${innerRole.name}, moving to ${
+        channel.name
+      }, removing ${extraRoles.map((role) => role.name).join(", ")}`
+    );
+    return [
+      member.roles.add(innerRole),
+      member.voice.setChannel(channel),
+      ...extraRoles.map((role) => member.roles.remove(role)),
+    ];
+  });
+
+  return Promise.all(promises);
+}
+
 function setupArea(
   guild: Guild,
   areaSetup: NonNullable<typeof GameStructure.scenes[0]["areaSetups"]>[0]
@@ -138,28 +169,7 @@ function setupArea(
         .get(guild.id)
         .get(innerName);
 
-      if (frameRole.members.size === 0) {
-        console.warn(`No player for ${frameRole.name}`);
-      }
-
-      return flatMap(frameRole.members.array(), (member) => {
-        const extraRoles = member.roles.cache.filter(
-          (role) =>
-            innerCharacterNames.includes(role.name) &&
-            role.name !== innerRole.name
-        );
-
-        console.log(
-          `Giving ${member.displayName} ${innerRole.name}, moving to ${
-            channel.name
-          }, removing ${extraRoles.map((role) => role.name).join(", ")}`
-        );
-        return [
-          member.roles.add(innerRole),
-          member.voice.setChannel(channel),
-          ...extraRoles.map((role) => member.roles.remove(role)),
-        ];
-      });
+      return [placeCharacter(guild, channel, frameRole, innerRole)];
     } else {
       console.log(`No inner character for ${frameRole.name}`);
       return [];
