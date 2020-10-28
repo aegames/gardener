@@ -1,0 +1,88 @@
+{
+  "areas": [
+    { "name": "Area 1" },
+    { "name": "Area 2" },
+    { "name": "Area 3" }
+  ],
+  "frameCharacters": [
+    { "name": "Devon" },
+    { "name": "Faith" },
+    { "name": "Jessica" },
+    { "name": "Kathy" },
+    { "name": "Larry" },
+    { "name": "Lindsay" },
+    { "name": "Lily" },
+    { "name": "Milo" },
+    { "name": "Noah" },
+    { "name": "Patrick" },
+    { "name": "Paula" },
+    { "name": "Rick" }
+  ],
+  "innerCharacters": [
+    {
+      "name": "Barbara",
+      "defaultFrameCharacterNames": ["Kathy", "Lindsay", "Faith"]
+    },
+    {
+      "name": "Virginia",
+      "defaultFrameCharacterNames": ["Jessica", "Lily", "Paula"]
+    },
+    {
+      "name": "William",
+      "defaultFrameCharacterNames": ["Milo", "Devon", "Rick"]
+    },
+    {
+      "name": "Charles",
+      "defaultFrameCharacterNames": ["Larry", "Patrick", "Noah"]
+    },
+    {
+      "name": "Stephanie",
+      "defaultFrameCharacterNames": ["Jessica", "Lily", "Paula"]
+    },
+    {
+      "name": "Zach",
+      "defaultFrameCharacterNames": ["Milo", "Devon", "Rick"]
+    }
+  ],
+  "scenes": [
+    {
+      "name": "Act I Scene 1",
+      "areaSetups": [
+        {
+          "areaName": "Area 1",
+          "placements": [
+            { "frameCharacterName": "Faith" },
+            { "frameCharacterName": "Jessica" },
+            { "frameCharacterName": "Larry" },
+            { "frameCharacterName": "Milo" }
+          ]
+        },
+        {
+          "areaName": "Area 2",
+          "placements": [
+            { "frameCharacterName": "Devon" },
+            { "frameCharacterName": "Kathy" },
+            { "frameCharacterName": "Lily" },
+            { "frameCharacterName": "Patrick" }
+          ]
+        },
+        {
+          "areaName": "Area 3",
+          "placements": [
+            { "frameCharacterName": "Lindsay" },
+            { "frameCharacterName": "Noah" },
+            { "frameCharacterName": "Paula" },
+            { "frameCharacterName": "Rick" }
+          ]
+        }
+      ]
+    },
+    { "name": "Act I Scene 2", "placements": [] },
+    { "name": "Act I Scene 3", "placements": [] },
+    { "name": "Act I Scene 4", "placements": [] },
+    { "name": "Act II Scene 1", "placements": [] },
+    { "name": "Act II Scene 2", "placements": [] },
+    { "name": "Act II Scene 3", "placements": [] },
+    { "name": "Act II Scene 4", "placements": [] }
+  ]
+}
