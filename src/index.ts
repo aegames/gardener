@@ -1,16 +1,10 @@
-import DiscordJS, {
-  Channel,
-  Guild,
-  GuildChannel,
-  GuildMember,
-  Role,
-} from "discord.js";
 import dotenv from "dotenv";
-import { flatMap } from "lodash";
-import { AreaSetup, parseGame, Scene } from "./Game";
+dotenv.config();
+
+import DiscordJS from "discord.js";
+import { parseGame } from "./Game";
 import { bringGuildUnderManagement, setupClient } from "./ManagedGuild";
 
-dotenv.config();
 const client = new DiscordJS.Client();
 
 const game = parseGame("./garden/structure.json");

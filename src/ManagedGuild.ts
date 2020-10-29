@@ -1,6 +1,15 @@
-import { Channel, Client, Guild, GuildChannel, Role } from "discord.js";
+import {
+  Channel,
+  Client,
+  Guild,
+  GuildChannel,
+  Message,
+  Role,
+} from "discord.js";
+import { flatMap } from "lodash";
 import { prepScene } from "./Commands";
-import { Game } from "./Game";
+import { getGameScene, setGameVariableValue } from "./Database";
+import { ChoiceVariable, Game } from "./Game";
 
 export type ManagedGuild = {
   areaChannels: Map<string, GuildChannel>;
@@ -112,6 +121,99 @@ async function roleChanged(role: Role) {
   }
 }
 
+type CommandDispatcher = (
+  managedGuild: ManagedGuild,
+  msg: Message,
+  args: string
+) => Promise<any> | void;
+
+const commandDispatchers: Record<string, CommandDispatcher> = {
+  list: (managedGuild: ManagedGuild, msg: Message) => {
+    msg.reply(
+      managedGuild.guild.channels.cache
+        .filter((channel) => channel.type === "voice")
+        .map((channel) => channel.name)
+        .join(", ")
+    );
+  },
+  prep: (managedGuild: ManagedGuild) =>
+    prepScene(managedGuild, managedGuild.game.scenes[0]),
+  choose: async (managedGuild: ManagedGuild, msg: Message, args: string) => {
+    const { member } = msg;
+    if (member == null) {
+      return;
+    }
+
+    const currentScene = await getGameScene(managedGuild, managedGuild.game);
+    if (currentScene == null) {
+      throw new Error(
+        "Choices can only be made in a scene, and the game currently isn't in one"
+      );
+    }
+
+    const frameCharacterRoles = member.roles.cache
+      .array()
+      .filter((role) =>
+        managedGuild.game.frameCharacterNames.includes(role.name)
+      );
+
+    const areas = currentScene.areaSetups
+      .filter((areaSetup) =>
+        areaSetup.placements.some((placement) =>
+          frameCharacterRoles.some(
+            (role) => role.name === placement.frameCharacter.name
+          )
+        )
+      )
+      .map((areaSetup) => areaSetup.area);
+
+    const availableChoiceVariables = flatMap(currentScene.choices, (choice) => {
+      if (choice.scope === "global") {
+        return managedGuild.game.globalVariables.get(choice.variableId);
+      } else if (choice.scope === "area") {
+        return areas.map((area) => area.variables.get(choice.variableId));
+      }
+    });
+    if (availableChoiceVariables.length === 0) {
+      throw new Error("You don't have any choices available right now.");
+    }
+
+    const availableChoiceValues = flatMap(
+      availableChoiceVariables,
+      (variable: ChoiceVariable) => variable.choices
+    );
+
+    const choiceHelp = `Here are your options:\n${availableChoiceValues
+      .map((choice) => `${choice.value}: ${choice.label}`)
+      .join("\n")}\n\nTo choose one, say something like "!choose ${
+      availableChoiceValues[0].value
+    }".`;
+
+    const choiceArg = args;
+    if (choiceArg === "") {
+      throw new Error(`Please specify a choice.  ${choiceHelp}`);
+    }
+
+    const choice = availableChoiceValues.find(
+      (choiceValue) => choiceValue.value === choiceArg
+    );
+    if (choice == null) {
+      throw new Error(
+        `${choiceArg} is not a valid choice right now.  ${choiceHelp}`
+      );
+    }
+
+    const variable = availableChoiceVariables.find((variable) =>
+      variable?.choices.some(
+        (choiceValue) => choiceValue.value === choice.value
+      )
+    )!;
+
+    await setGameVariableValue(managedGuild, variable, choice.value);
+    msg.reply(`Thank you.  Choice recorded: ${choice.label}`);
+  },
+};
+
 export function setupClient(client: Client) {
   client.on("channelCreate", maybeLoadGuildChannels);
   client.on("channelUpdate", maybeLoadGuildChannels);
@@ -130,16 +232,20 @@ export function setupClient(client: Client) {
       return;
     }
 
-    if (msg.content === "!list" && managedGuild.guild) {
-      msg.reply(
-        managedGuild.guild.channels.cache
-          .filter((channel) => channel.type === "voice")
-          .map((channel) => channel.name)
-          .join(", ")
-      );
-    } else if (msg.content === "!prep") {
+    const match = msg.content.match(/^\!(\w+)(\s+(.*))?$/);
+    if (!match) {
+      return;
+    }
+
+    const command = match[1].toLowerCase();
+    const args = match[2]?.trim() ?? "";
+
+    console.log(`>> ${msg.member?.user.tag}: ${msg.content}`);
+
+    const dispatcher = commandDispatchers[command];
+    if (dispatcher != null) {
       try {
-        await prepScene(managedGuild, managedGuild.game.scenes[0]);
+        await dispatcher(managedGuild, msg, args);
       } catch (error) {
         msg.reply(error.message);
       }

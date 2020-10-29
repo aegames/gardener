@@ -1,5 +1,6 @@
 import { GuildChannel, Role } from "discord.js";
 import { flatMap } from "lodash";
+import { setGameScene } from "./Database";
 import { AreaSetup, Game, Scene } from "./Game";
 import type { ManagedGuild } from "./ManagedGuild";
 
@@ -74,9 +75,10 @@ function setupArea(managedGuild: ManagedGuild, areaSetup: AreaSetup) {
 }
 
 export function prepScene(managedGuild: ManagedGuild, scene: Scene) {
-  return Promise.all(
-    (scene.areaSetups ?? []).map((areaSetup) =>
+  return Promise.all<any>([
+    setGameScene(managedGuild, scene),
+    ...(scene.areaSetups ?? []).map((areaSetup) =>
       setupArea(managedGuild, areaSetup)
-    )
-  );
+    ),
+  ]);
 }

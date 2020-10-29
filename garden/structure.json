@@ -131,6 +131,12 @@
   "scenes": [
     {
       "name": "Act I Scene 1",
+      "choices": [
+        {
+          "variableId": "barbaraSpouse",
+          "scope": "area"
+        }
+      ],
       "areaSetups": [
         {
           "areaName": "Area 1",

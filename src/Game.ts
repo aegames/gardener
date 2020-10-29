@@ -26,6 +26,11 @@ type VariableDefinitionOrTemplateReference = z.infer<
   typeof VariableDefinitionOrTemplateReferenceSchema
 >;
 
+const ChoiceSchema = z.object({
+  variableId: z.string(),
+  scope: z.union([z.literal("area"), z.literal("global")]),
+});
+
 const GameStructureSchema = z.object({
   variableTemplates: z.optional(
     z.array(
@@ -60,6 +65,7 @@ const GameStructureSchema = z.object({
   scenes: z.array(
     z.object({
       name: z.string(),
+      choices: z.optional(z.array(ChoiceSchema)),
       areaSetups: z.array(
         z.object({
           areaName: z.string(),
@@ -77,8 +83,12 @@ const GameStructureSchema = z.object({
 
 type GameStructure = z.infer<typeof GameStructureSchema>;
 
-export type ChoiceVariable = {
+type VariableBase = {
   id: string;
+  scope: string;
+};
+
+export type ChoiceVariable = VariableBase & {
   type: "choice";
   choices: {
     value: string;
@@ -113,8 +123,14 @@ export type AreaSetup = {
   placements: Placement[];
 };
 
+export type Choice = {
+  variableId: string;
+  scope: "area" | "global";
+};
+
 export type Scene = {
   name: string;
+  choices: Choice[];
   areaSetups: AreaSetup[];
 };
 
@@ -132,10 +148,14 @@ export type Game = {
 
 type VariableTemplateMap = Map<string, GameVariable[]>;
 
-function parseVariable(definition: VariableDefinition): GameVariable {
+function parseVariable(
+  definition: VariableDefinition,
+  scope: string
+): GameVariable {
   if (definition.type === "choice") {
     return {
       id: definition.id,
+      scope,
       type: "choice",
       choices: [...definition.choices],
     };
@@ -146,7 +166,8 @@ function parseVariable(definition: VariableDefinition): GameVariable {
 
 function parseVariableOrTemplateReference(
   definition: VariableDefinitionOrTemplateReference,
-  variableTemplates: VariableTemplateMap
+  variableTemplates: VariableTemplateMap,
+  scope: string
 ): GameVariable[] {
   if ("templateId" in definition) {
     const variables = variableTemplates.get(definition.templateId);
@@ -155,19 +176,23 @@ function parseVariableOrTemplateReference(
         `No variable template with id "${definition.templateId}"`
       );
     }
-    return variables;
+    return variables.map((definition) => ({
+      ...definition,
+      scope,
+    }));
   } else {
-    return [parseVariable(definition)];
+    return [parseVariable(definition, scope)];
   }
 }
 
 function parseVariableOrTemplateReferenceList(
   definitions: VariableDefinitionOrTemplateReference[],
-  variableTemplates: VariableTemplateMap
+  variableTemplates: VariableTemplateMap,
+  scope: string
 ): Map<string, GameVariable> {
   return new Map<string, GameVariable>(
     flatMap(definitions, (varDef) =>
-      parseVariableOrTemplateReference(varDef, variableTemplates)
+      parseVariableOrTemplateReference(varDef, variableTemplates, scope)
     ).map((variable) => [variable.id, variable])
   );
 }
@@ -176,8 +201,15 @@ export function loadGame(structure: GameStructure): Game {
   const variableTemplates: VariableTemplateMap = new Map(
     (structure.variableTemplates ?? []).map((template) => [
       template.id,
-      template.variables.map(parseVariable),
+      template.variables.map((definition) =>
+        parseVariable(definition, `template.${template.id}`)
+      ),
     ])
+  );
+  const globalVariables = parseVariableOrTemplateReferenceList(
+    structure.globalVariables ?? [],
+    variableTemplates,
+    "global"
   );
 
   const areas = new Map<string, Area>(
@@ -187,7 +219,8 @@ export function loadGame(structure: GameStructure): Game {
         name: area.name,
         variables: parseVariableOrTemplateReferenceList(
           area.variables ?? [],
-          variableTemplates
+          variableTemplates,
+          `area.${area.name.toLowerCase().replace(/\W/g, "_")}`
         ),
       },
     ])
@@ -222,6 +255,7 @@ export function loadGame(structure: GameStructure): Game {
   );
   const scenes: Scene[] = structure.scenes.map((scene) => ({
     name: scene.name,
+    choices: scene.choices ?? [],
     areaSetups: scene.areaSetups.map((areaSetup) => {
       const area = areas.get(areaSetup.areaName);
       if (!area) {
@@ -266,10 +300,7 @@ export function loadGame(structure: GameStructure): Game {
     areaNames: [...areas.keys()],
     frameCharacters,
     frameCharacterNames: [...frameCharacters.keys()],
-    globalVariables: parseVariableOrTemplateReferenceList(
-      structure.globalVariables ?? [],
-      variableTemplates
-    ),
+    globalVariables,
     innerCharacters,
     innerCharacterNames: [...innerCharacters.keys()],
     scenes,
