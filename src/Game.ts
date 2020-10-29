@@ -1,10 +1,49 @@
 import * as z from "zod";
 import fs from "fs";
+import { flatMap } from "lodash";
+
+const ChoiceVariableDefinitionSchema = z.object({
+  id: z.string(),
+  type: z.literal("choice"),
+  choices: z.array(
+    z.object({
+      value: z.string(),
+      label: z.string(),
+    })
+  ),
+});
+
+const VariableDefinitionSchema = ChoiceVariableDefinitionSchema; // reserved for future extensibility
+type VariableDefinition = z.infer<typeof VariableDefinitionSchema>;
+
+const VariableDefinitionOrTemplateReferenceSchema = z.union([
+  VariableDefinitionSchema,
+  z.object({
+    templateId: z.string(),
+  }),
+]);
+type VariableDefinitionOrTemplateReference = z.infer<
+  typeof VariableDefinitionOrTemplateReferenceSchema
+>;
 
 const GameStructureSchema = z.object({
+  variableTemplates: z.optional(
+    z.array(
+      z.object({
+        id: z.string(),
+        variables: z.array(VariableDefinitionSchema),
+      })
+    )
+  ),
+  globalVariables: z.optional(
+    z.array(VariableDefinitionOrTemplateReferenceSchema)
+  ),
   areas: z.array(
     z.object({
       name: z.string(),
+      variables: z.optional(
+        z.array(VariableDefinitionOrTemplateReferenceSchema)
+      ),
     })
   ),
   frameCharacters: z.array(
@@ -38,8 +77,20 @@ const GameStructureSchema = z.object({
 
 type GameStructure = z.infer<typeof GameStructureSchema>;
 
+export type ChoiceVariable = {
+  id: string;
+  type: "choice";
+  choices: {
+    value: string;
+    label: string;
+  }[];
+};
+
+export type GameVariable = ChoiceVariable; // reserved for future extensibility
+
 export type Area = {
   name: string;
+  variables: Map<string, GameVariable>;
 };
 
 export type FrameCharacter = {
@@ -72,15 +123,74 @@ export type Game = {
   areaNames: string[];
   frameCharacters: Map<string, FrameCharacter>;
   frameCharacterNames: string[];
+  globalVariables: Map<string, GameVariable>;
   innerCharacters: Map<string, InnerCharacter>;
   innerCharacterNames: string[];
   scenes: Scene[];
   sceneNames: string[];
 };
 
+type VariableTemplateMap = Map<string, GameVariable[]>;
+
+function parseVariable(definition: VariableDefinition): GameVariable {
+  if (definition.type === "choice") {
+    return {
+      id: definition.id,
+      type: "choice",
+      choices: [...definition.choices],
+    };
+  } else {
+    throw new Error(`Unknown variable type: "${definition.type}"`);
+  }
+}
+
+function parseVariableOrTemplateReference(
+  definition: VariableDefinitionOrTemplateReference,
+  variableTemplates: VariableTemplateMap
+): GameVariable[] {
+  if ("templateId" in definition) {
+    const variables = variableTemplates.get(definition.templateId);
+    if (variables == null) {
+      throw new Error(
+        `No variable template with id "${definition.templateId}"`
+      );
+    }
+    return variables;
+  } else {
+    return [parseVariable(definition)];
+  }
+}
+
+function parseVariableOrTemplateReferenceList(
+  definitions: VariableDefinitionOrTemplateReference[],
+  variableTemplates: VariableTemplateMap
+): Map<string, GameVariable> {
+  return new Map<string, GameVariable>(
+    flatMap(definitions, (varDef) =>
+      parseVariableOrTemplateReference(varDef, variableTemplates)
+    ).map((variable) => [variable.id, variable])
+  );
+}
+
 export function loadGame(structure: GameStructure): Game {
+  const variableTemplates: VariableTemplateMap = new Map(
+    (structure.variableTemplates ?? []).map((template) => [
+      template.id,
+      template.variables.map(parseVariable),
+    ])
+  );
+
   const areas = new Map<string, Area>(
-    structure.areas.map((area: any) => [area.name, area])
+    structure.areas.map((area) => [
+      area.name,
+      {
+        name: area.name,
+        variables: parseVariableOrTemplateReferenceList(
+          area.variables ?? [],
+          variableTemplates
+        ),
+      },
+    ])
   );
   const frameCharacters = new Map<string, FrameCharacter>(
     structure.frameCharacters.map((character) => [character.name, character])
@@ -156,6 +266,10 @@ export function loadGame(structure: GameStructure): Game {
     areaNames: [...areas.keys()],
     frameCharacters,
     frameCharacterNames: [...frameCharacters.keys()],
+    globalVariables: parseVariableOrTemplateReferenceList(
+      structure.globalVariables ?? [],
+      variableTemplates
+    ),
     innerCharacters,
     innerCharacterNames: [...innerCharacters.keys()],
     scenes,
