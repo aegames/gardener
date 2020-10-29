@@ -36,12 +36,10 @@
       "defaultFrameCharacterNames": ["Larry", "Patrick", "Noah"]
     },
     {
-      "name": "Stephanie",
-      "defaultFrameCharacterNames": ["Jessica", "Lily", "Paula"]
+      "name": "Stephanie"
     },
     {
-      "name": "Zach",
-      "defaultFrameCharacterNames": ["Milo", "Devon", "Rick"]
+      "name": "Zach"
     }
   ],
   "scenes": [
@@ -77,12 +75,19 @@
         }
       ]
     },
-    { "name": "Act I Scene 2", "placements": [] },
-    { "name": "Act I Scene 3", "placements": [] },
-    { "name": "Act I Scene 4", "placements": [] },
-    { "name": "Act II Scene 1", "placements": [] },
-    { "name": "Act II Scene 2", "placements": [] },
-    { "name": "Act II Scene 3", "placements": [] },
-    { "name": "Act II Scene 4", "placements": [] }
+    { "name": "Act I Scene 2", "areaSetups": [] },
+    { "name": "Act I Scene 3", "areaSetups": [] },
+    { "name": "Act I Scene 4", "areaSetups": [] },
+    { "name": "Act II Scene 1", "areaSetups": [
+      {
+        "areaName": "Area 1",
+        "placements": [
+          { "frameCharacterName": "Lily", "innerCharacterName": "Stephanie" }
+        ]
+      }
+    ] },
+    { "name": "Act II Scene 2", "areaSetups": [] },
+    { "name": "Act II Scene 3", "areaSetups": [] },
+    { "name": "Act II Scene 4", "areaSetups": [] }
   ]
 }

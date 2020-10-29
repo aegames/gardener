@@ -7,8 +7,8 @@
     "noImplicitAny": true,
     "moduleResolution": "node",
     "sourceMap": true,
-    "resolveJsonModule": true,
     "lib": ["ES2020.Promise"],
+    "strictNullChecks": true,
     "outDir": "dist",
     "baseUrl": ".",
     "paths": {
