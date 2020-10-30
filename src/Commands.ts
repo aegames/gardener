@@ -1,16 +1,21 @@
 import { GuildChannel, GuildMember, OverwriteResolvable, Role } from 'discord.js';
-import { flatMap } from 'lodash';
-import { getGameScene, setGameScene, setGameVariableValue } from './Database';
-import { AreaSetup, findAreaForFrameCharacter, Game, getSceneChoices, Scene } from './Game';
-import type { ManagedGuild } from './ManagedGuild';
-import { notEmpty } from './Utils';
+import { flatMap, flatten } from 'lodash';
+import { getGameScene, setGameScene, setGameVariableValue } from './database';
+import { Area, AreaSetup, findAreaForFrameCharacter, Game, getSceneChoices, Scene } from './game';
+import type { ManagedGuild } from './managedGuild';
+import { notEmpty } from './utils';
 
-function placeCharacter(voiceChannel: GuildChannel, frameRole: Role, innerRole: Role, game: Game) {
+async function placeCharacter(
+  voiceChannel: GuildChannel,
+  frameRole: Role,
+  innerRole: Role,
+  game: Game,
+) {
   if (frameRole.members.size === 0) {
     console.warn(`No player for ${frameRole.name}`);
   }
 
-  const promises = flatMap(frameRole.members.array(), (member) => {
+  const promises = frameRole.members.array().map(async (member) => {
     const extraRoles = member.roles.cache.filter(
       (role) => game.innerCharacterNames.includes(role.name) && role.name !== innerRole.name,
     );
@@ -20,17 +25,24 @@ function placeCharacter(voiceChannel: GuildChannel, frameRole: Role, innerRole: 
         extraRoles.size > 0 ? `removing ${extraRoles.map((role) => role.name).join(', ')}` : ''
       }`,
     );
-    return [
+
+    await Promise.all([
       member.roles.add(innerRole),
-      member.voice.setChannel(voiceChannel),
       ...extraRoles.map((role) => member.roles.remove(role)),
-    ];
+    ]);
+
+    try {
+      await member.voice.setChannel(voiceChannel);
+      return { member, voiceChannelJoined: true };
+    } catch (error) {
+      return { member, voiceChannelJoined: false, voiceChannelJoinError: error };
+    }
   });
 
-  return Promise.all(promises);
+  return await Promise.all(promises);
 }
 
-function setupArea(managedGuild: ManagedGuild, areaSetup: AreaSetup) {
+async function setupArea(managedGuild: ManagedGuild, areaSetup: AreaSetup) {
   const voiceChannel = managedGuild.areaVoiceChannels.get(areaSetup.area.name);
   const textChannel = managedGuild.areaTextChannels.get(areaSetup.area.name);
   if (!voiceChannel || !textChannel) {
@@ -42,6 +54,16 @@ function setupArea(managedGuild: ManagedGuild, areaSetup: AreaSetup) {
   const frameRoles = areaSetup.placements
     .map((placement) => managedGuild.frameCharacterRoles.get(placement.frameCharacter.name))
     .filter(notEmpty);
+
+  const permissionOverwrites: OverwriteResolvable[] = [
+    { id: managedGuild.guild.id, deny: ['VIEW_CHANNEL'] },
+    ...frameRoles.map((role) => ({ id: role.id, allow: ['VIEW_CHANNEL'] as const })),
+  ];
+
+  await Promise.all([
+    textChannel.overwritePermissions(permissionOverwrites),
+    voiceChannel.overwritePermissions(permissionOverwrites),
+  ]);
 
   const placementPromises = flatMap(areaSetup.placements, (placement) => {
     const frameRole = managedGuild.frameCharacterRoles.get(placement.frameCharacter.name);
@@ -60,23 +82,31 @@ function setupArea(managedGuild: ManagedGuild, areaSetup: AreaSetup) {
     return [placeCharacter(voiceChannel, frameRole, innerRole, managedGuild.game)];
   });
 
-  const permissionOverwrites: OverwriteResolvable[] = [
-    { id: managedGuild.guild.id, deny: ['VIEW_CHANNEL'] },
-    ...frameRoles.map((role) => ({ id: role.id, allow: ['VIEW_CHANNEL'] as const })),
-  ];
-
-  return Promise.all<any>([
-    ...placementPromises,
-    textChannel.overwritePermissions(permissionOverwrites),
-    voiceChannel.overwritePermissions(permissionOverwrites),
-  ]);
+  const placementResults = await Promise.all(placementPromises);
+  return { area: areaSetup.area, placementResults: flatten(placementResults) };
 }
 
-export function prepScene(managedGuild: ManagedGuild, scene: Scene) {
-  return Promise.all<any>([
-    setGameScene(managedGuild, scene),
-    ...(scene.areaSetups ?? []).map((areaSetup) => setupArea(managedGuild, areaSetup)),
-  ]);
+export type PrepSceneResults = {
+  scene: Scene;
+  areaSetupResults: {
+    area: Area;
+    placementResults: {
+      member: GuildMember;
+      voiceChannelJoined: boolean;
+      voiceChannelJoinError?: Error;
+    }[];
+  }[];
+};
+
+export async function prepScene(
+  managedGuild: ManagedGuild,
+  scene: Scene,
+): Promise<PrepSceneResults> {
+  await setGameScene(managedGuild, scene);
+  const areaSetupResults = await Promise.all(
+    (scene.areaSetups ?? []).map((areaSetup) => setupArea(managedGuild, areaSetup)),
+  );
+  return { scene, areaSetupResults };
 }
 
 export async function prepNextScene(managedGuild: ManagedGuild) {
@@ -93,8 +123,7 @@ export async function prepNextScene(managedGuild: ManagedGuild) {
     throw new Error('This is the last scene in the game.');
   }
 
-  await prepScene(managedGuild, nextScene);
-  return nextScene;
+  return await prepScene(managedGuild, nextScene);
 }
 
 export function getFrameCharacterRoles(member: GuildMember, game: Game) {

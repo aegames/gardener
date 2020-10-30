@@ -2,8 +2,8 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import DiscordJS from 'discord.js';
-import { parseGame } from './Game';
-import { bringGuildUnderManagement, setupClient } from './ManagedGuild';
+import { parseGame } from './game';
+import { bringGuildUnderManagement, setupClient } from './managedGuild';
 
 const client = new DiscordJS.Client();
 

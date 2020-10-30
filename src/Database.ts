@@ -1,6 +1,6 @@
 import { Pool } from 'pg';
-import { Game, GameVariable, Scene } from './Game';
-import { ManagedGuild } from './ManagedGuild';
+import { Game, GameVariable, Scene } from './game';
+import { ManagedGuild } from './managedGuild';
 
 export const dbPool = new Pool({
   connectionString: process.env.DATABASE_URL,

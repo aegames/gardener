@@ -1,8 +1,8 @@
 import assertNever from 'assert-never';
-import { getGameVariableValue } from './Database';
-import { Area, Game } from './Game';
-import { BooleanExpression, ValueExpression, VariableReference } from './GameStructure';
-import { ManagedGuild } from './ManagedGuild';
+import { getGameVariableValue } from './database';
+import { Area, Game } from './game';
+import { BooleanExpression, ValueExpression, VariableReference } from './gameStructure';
+import { ManagedGuild } from './managedGuild';
 
 export type ResolutionContext = {
   area?: Area;

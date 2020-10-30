@@ -1,6 +1,6 @@
-import { Channel, Client, Guild, GuildChannel, Message, Role } from 'discord.js';
-import { makeChoice, prepNextScene, prepScene } from './Commands';
-import { Game } from './Game';
+import { Channel, Client, Guild, GuildChannel, Role } from 'discord.js';
+import { handleCommand } from './commandHandlers';
+import { Game } from './game';
 
 export type ManagedGuild = {
   areaTextChannels: Map<string, GuildChannel>;
@@ -69,8 +69,8 @@ function checkReadyToPlay(managedGuild: ManagedGuild) {
   } else {
     if (!managedGuild.readyToPlay) {
       guild.systemChannel?.send('Errors corrected!  Ready to play.');
+      console.log(`${guild.name} is ready to play`);
     }
-    console.log(`${guild.name} is ready to play`);
     managedGuild.readyToPlay = true;
   }
 }
@@ -136,50 +136,6 @@ async function roleChanged(role: Role) {
   }
 }
 
-type CommandDispatcher = (
-  managedGuild: ManagedGuild,
-  msg: Message,
-  args: string,
-) => Promise<any> | void;
-
-const commandDispatchers: Record<string, CommandDispatcher> = {
-  list: (managedGuild: ManagedGuild, msg: Message) => {
-    msg.reply(
-      managedGuild.guild.channels.cache
-        .filter((channel) => channel.type === 'voice')
-        .map((channel) => channel.name)
-        .join(', '),
-    );
-  },
-  prep: async (managedGuild: ManagedGuild, msg: Message, args: string) => {
-    if (args === 'next') {
-      const scene = await prepNextScene(managedGuild);
-      msg.reply(`Prepped ${scene.name}`);
-    } else {
-      const scene = managedGuild.game.scenes.find((scene) => scene.name === args);
-      if (scene) {
-        await prepScene(managedGuild, managedGuild.game.scenes[0]);
-        msg.reply(`Prepped ${scene.name}`);
-      } else {
-        msg.reply(
-          `Invalid command.  To prep a scene, you can say:\n!prep next (for the next scene)\n${managedGuild.game.scenes
-            .map((scene) => `!prep ${scene.name}`)
-            .join('\n')}`,
-        );
-      }
-    }
-  },
-  choose: async (managedGuild: ManagedGuild, msg: Message, args: string) => {
-    const { member } = msg;
-    if (member == null) {
-      return;
-    }
-
-    const choice = await makeChoice(managedGuild, member, args);
-    msg.reply(`Thank you.  Choice recorded: ${choice.label}`);
-  },
-};
-
 export function setupClient(client: Client) {
   client.on('channelCreate', maybeLoadGuildChannels);
   client.on('channelUpdate', maybeLoadGuildChannels);
@@ -207,16 +163,7 @@ export function setupClient(client: Client) {
     const args = match[2]?.trim() ?? '';
 
     console.log(`>> ${msg.member?.user.tag}: ${msg.content}`);
-
-    const dispatcher = commandDispatchers[command];
-    if (dispatcher != null) {
-      try {
-        await dispatcher(managedGuild, msg, args);
-      } catch (error) {
-        console.error(error);
-        msg.reply(error.message);
-      }
-    }
+    await handleCommand(managedGuild, msg, command, args);
   });
 }
 

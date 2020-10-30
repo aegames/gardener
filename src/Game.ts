@@ -7,9 +7,9 @@ import {
   VariableDefinition,
   VariableDefinitionOrTemplateReference,
 } from './GameStructure';
-import { evaluateBooleanExpression, ResolutionContext, resolveVariable } from './GameLogic';
-import { ManagedGuild } from './ManagedGuild';
-import { notEmpty } from './Utils';
+import { evaluateBooleanExpression, ResolutionContext, resolveVariable } from './gameLogic';
+import { ManagedGuild } from './managedGuild';
+import { notEmpty } from './utils';
 
 type VariableBase = {
   id: string;
