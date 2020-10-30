@@ -169,6 +169,25 @@
     },
     {
       "name": "Act I Scene 2",
+      "choices": [
+        {
+          "variableId": "barbaraCheated",
+          "scope": "area"
+        },
+        {
+          "variableId": "spouseCheated",
+          "scope": "area",
+          "if": {
+            "eq": [
+              "A",
+              {
+                "variableId": "barbaraSpouse",
+                "scope": "area"
+              }
+            ]
+          }
+        }
+      ],
       "areaSetups": [
         {
           "areaName": "Area 1",
@@ -201,6 +220,12 @@
     },
     {
       "name": "Act I Scene 3",
+      "choices": [
+        {
+          "variableId": "divorce",
+          "scope": "area"
+        }
+      ],
       "areaSetups": [
         {
           "areaName": "Area 1",
@@ -233,6 +258,12 @@
     },
     {
       "name": "Act I Scene 4",
+      "choices": [
+        {
+          "variableId": "virginiaNursingHome",
+          "scope": "area"
+        }
+      ],
       "areaSetups": [
         {
           "areaName": "Area 1",
@@ -265,6 +296,12 @@
     },
     {
       "name": "Act II Scene 1",
+      "choices": [
+        {
+          "variableId": "brotherLentMoney",
+          "scope": "area"
+        }
+      ],
       "areaSetups": [
         {
           "areaName": "Area 1",
@@ -300,6 +337,12 @@
     },
     {
       "name": "Act II Scene 2",
+      "choices": [
+        {
+          "variableId": "drunkDrivingConsequences",
+          "scope": "area"
+        }
+      ],
       "areaSetups": [
         {
           "areaName": "Area 1",
@@ -335,6 +378,12 @@
     },
     {
       "name": "Act II Scene 3",
+      "choices": [
+        {
+          "variableId": "acceptZach",
+          "scope": "area"
+        }
+      ],
       "areaSetups": [
         {
           "areaName": "Area 1",

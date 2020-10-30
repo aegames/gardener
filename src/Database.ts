@@ -23,7 +23,7 @@ export async function getGameVariableValue(
     return undefined;
   }
 
-  return JSON.parse(result.rows[0].value);
+  return result.rows[0].value;
 }
 
 export function setGameVariableValue(

@@ -1,7 +1,13 @@
-import { GuildChannel, Role } from "discord.js";
+import { GuildChannel, GuildMember, Role } from "discord.js";
 import { flatMap } from "lodash";
-import { setGameScene } from "./Database";
-import { AreaSetup, Game, Scene } from "./Game";
+import { getGameScene, setGameScene, setGameVariableValue } from "./Database";
+import {
+  AreaSetup,
+  findAreaForFrameCharacter,
+  Game,
+  getSceneChoices,
+  Scene,
+} from "./Game";
 import type { ManagedGuild } from "./ManagedGuild";
 
 function placeCharacter(
@@ -81,4 +87,96 @@ export function prepScene(managedGuild: ManagedGuild, scene: Scene) {
       setupArea(managedGuild, areaSetup)
     ),
   ]);
+}
+
+export async function prepNextScene(managedGuild: ManagedGuild) {
+  const currentScene = await getGameScene(managedGuild, managedGuild.game);
+  if (currentScene == null) {
+    throw new Error("There is no active scene right now.");
+  }
+
+  const nextScene =
+    managedGuild.game.scenes[
+      managedGuild.game.scenes.findIndex(
+        (scene) => scene.name === currentScene.name
+      ) + 1
+    ];
+  if (nextScene == null) {
+    throw new Error("This is the last scene in the game.");
+  }
+
+  await prepScene(managedGuild, nextScene);
+  return nextScene;
+}
+
+export function getFrameCharacterRoles(member: GuildMember, game: Game) {
+  return member.roles.cache
+    .array()
+    .filter((role) => game.frameCharacterNames.includes(role.name));
+}
+
+export async function getAvailableChoicesForMember(
+  managedGuild: ManagedGuild,
+  member: GuildMember
+) {
+  const currentScene = await getGameScene(managedGuild, managedGuild.game);
+  if (currentScene == null) {
+    throw new Error(
+      "Choices can only be made in a scene, and the game currently isn't in one"
+    );
+  }
+
+  const frameCharacterRoles = getFrameCharacterRoles(member, managedGuild.game);
+  const area = findAreaForFrameCharacter(frameCharacterRoles, currentScene);
+  const availableChoiceVariables = await getSceneChoices(
+    managedGuild,
+    managedGuild.game,
+    currentScene,
+    { area }
+  );
+
+  return flatMap(availableChoiceVariables, (variable) =>
+    variable.choices.map((choice) => ({
+      variable,
+      value: choice.value,
+      label: choice.label,
+    }))
+  );
+}
+
+export async function makeChoice(
+  managedGuild: ManagedGuild,
+  member: GuildMember,
+  args: string
+) {
+  const availableChoices = await getAvailableChoicesForMember(
+    managedGuild,
+    member
+  );
+  if (availableChoices.length === 0) {
+    throw new Error("You don't have any choices available right now.");
+  }
+
+  const choiceHelp = `Here are your options:\n${availableChoices
+    .map((choice) => `${choice.value}: ${choice.label}`)
+    .join("\n")}\n\nTo choose one, say something like "!choose ${
+    availableChoices[0].value
+  }".`;
+
+  const choiceArg = args;
+  if (choiceArg === "") {
+    throw new Error(`Please specify a choice.  ${choiceHelp}`);
+  }
+
+  const choice = availableChoices.find(
+    (choiceValue) => choiceValue.value === choiceArg
+  );
+  if (choice == null) {
+    throw new Error(
+      `${choiceArg} is not a valid choice right now.  ${choiceHelp}`
+    );
+  }
+
+  await setGameVariableValue(managedGuild, choice.variable, choice.value);
+  return choice;
 }

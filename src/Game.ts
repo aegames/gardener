@@ -1,87 +1,19 @@
-import * as z from "zod";
-import fs from "fs";
 import { flatMap } from "lodash";
-
-const ChoiceVariableDefinitionSchema = z.object({
-  id: z.string(),
-  type: z.literal("choice"),
-  choices: z.array(
-    z.object({
-      value: z.string(),
-      label: z.string(),
-    })
-  ),
-});
-
-const VariableDefinitionSchema = ChoiceVariableDefinitionSchema; // reserved for future extensibility
-type VariableDefinition = z.infer<typeof VariableDefinitionSchema>;
-
-const VariableDefinitionOrTemplateReferenceSchema = z.union([
-  VariableDefinitionSchema,
-  z.object({
-    templateId: z.string(),
-  }),
-]);
-type VariableDefinitionOrTemplateReference = z.infer<
-  typeof VariableDefinitionOrTemplateReferenceSchema
->;
-
-const ChoiceSchema = z.object({
-  variableId: z.string(),
-  scope: z.union([z.literal("area"), z.literal("global")]),
-});
-
-const GameStructureSchema = z.object({
-  variableTemplates: z.optional(
-    z.array(
-      z.object({
-        id: z.string(),
-        variables: z.array(VariableDefinitionSchema),
-      })
-    )
-  ),
-  globalVariables: z.optional(
-    z.array(VariableDefinitionOrTemplateReferenceSchema)
-  ),
-  areas: z.array(
-    z.object({
-      name: z.string(),
-      variables: z.optional(
-        z.array(VariableDefinitionOrTemplateReferenceSchema)
-      ),
-    })
-  ),
-  frameCharacters: z.array(
-    z.object({
-      name: z.string(),
-    })
-  ),
-  innerCharacters: z.array(
-    z.object({
-      name: z.string(),
-      defaultFrameCharacterNames: z.optional(z.array(z.string())),
-    })
-  ),
-  scenes: z.array(
-    z.object({
-      name: z.string(),
-      choices: z.optional(z.array(ChoiceSchema)),
-      areaSetups: z.array(
-        z.object({
-          areaName: z.string(),
-          placements: z.array(
-            z.object({
-              frameCharacterName: z.string(),
-              innerCharacterName: z.ostring(),
-            })
-          ),
-        })
-      ),
-    })
-  ),
-});
-
-type GameStructure = z.infer<typeof GameStructureSchema>;
+import { Role } from "discord.js";
+import {
+  BooleanExpression,
+  GameStructure,
+  loadGameStructure,
+  VariableDefinition,
+  VariableDefinitionOrTemplateReference,
+} from "./GameStructure";
+import {
+  evaluateBooleanExpression,
+  ResolutionContext,
+  resolveVariable,
+} from "./GameLogic";
+import { ManagedGuild } from "./ManagedGuild";
+import { notEmpty } from "./Utils";
 
 type VariableBase = {
   id: string;
@@ -126,6 +58,7 @@ export type AreaSetup = {
 export type Choice = {
   variableId: string;
   scope: "area" | "global";
+  if?: BooleanExpression;
 };
 
 export type Scene = {
@@ -309,9 +242,59 @@ export function loadGame(structure: GameStructure): Game {
 }
 
 export function parseGame(filename: string) {
-  return loadGame(
-    GameStructureSchema.parse(
-      JSON.parse(fs.readFileSync(filename).toString("utf-8"))
+  return loadGame(loadGameStructure(filename));
+}
+
+export function findAreaForFrameCharacter(
+  frameCharacterRoles: Role[],
+  scene: Scene
+) {
+  return scene.areaSetups.find((areaSetup) =>
+    areaSetup.placements.some((placement) =>
+      frameCharacterRoles.some(
+        (role) => role.name === placement.frameCharacter.name
+      )
+    )
+  )?.area;
+}
+
+async function resolveSceneChoice(
+  managedGuild: ManagedGuild,
+  game: Game,
+  context: ResolutionContext,
+  choice: Choice
+) {
+  if (choice.if != null) {
+    const passed = await evaluateBooleanExpression(
+      managedGuild,
+      game,
+      choice.if,
+      context
+    );
+    if (!passed) {
+      return undefined;
+    }
+  }
+
+  const variable = resolveVariable(game, choice, context);
+  if (variable == null) {
+    return undefined;
+  }
+
+  return variable;
+}
+
+export async function getSceneChoices(
+  managedGuild: ManagedGuild,
+  game: Game,
+  scene: Scene,
+  context: ResolutionContext
+): Promise<ChoiceVariable[]> {
+  const resolvedVariables = await Promise.all(
+    scene.choices.map((choice) =>
+      resolveSceneChoice(managedGuild, game, context, choice)
     )
   );
+
+  return resolvedVariables.filter(notEmpty);
 }

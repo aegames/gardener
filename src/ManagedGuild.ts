@@ -7,9 +7,20 @@ import {
   Role,
 } from "discord.js";
 import { flatMap } from "lodash";
-import { prepScene } from "./Commands";
+import {
+  getAvailableChoicesForMember,
+  getFrameCharacterRoles,
+  makeChoice,
+  prepNextScene,
+  prepScene,
+} from "./Commands";
 import { getGameScene, setGameVariableValue } from "./Database";
-import { ChoiceVariable, Game } from "./Game";
+import {
+  ChoiceVariable,
+  findAreaForFrameCharacter,
+  Game,
+  getSceneChoices,
+} from "./Game";
 
 export type ManagedGuild = {
   areaChannels: Map<string, GuildChannel>;
@@ -136,80 +147,33 @@ const commandDispatchers: Record<string, CommandDispatcher> = {
         .join(", ")
     );
   },
-  prep: (managedGuild: ManagedGuild) =>
-    prepScene(managedGuild, managedGuild.game.scenes[0]),
+  prep: async (managedGuild: ManagedGuild, msg: Message, args: string) => {
+    if (args === "next") {
+      const scene = await prepNextScene(managedGuild);
+      msg.reply(`Prepped ${scene.name}`);
+    } else {
+      const scene = managedGuild.game.scenes.find(
+        (scene) => scene.name === args
+      );
+      if (scene) {
+        await prepScene(managedGuild, managedGuild.game.scenes[0]);
+        msg.reply(`Prepped ${scene.name}`);
+      } else {
+        msg.reply(
+          `Invalid command.  To prep a scene, you can say:\n!prep next (for the next scene)\n${managedGuild.game.scenes
+            .map((scene) => `!prep ${scene.name}`)
+            .join("\n")}`
+        );
+      }
+    }
+  },
   choose: async (managedGuild: ManagedGuild, msg: Message, args: string) => {
     const { member } = msg;
     if (member == null) {
       return;
     }
 
-    const currentScene = await getGameScene(managedGuild, managedGuild.game);
-    if (currentScene == null) {
-      throw new Error(
-        "Choices can only be made in a scene, and the game currently isn't in one"
-      );
-    }
-
-    const frameCharacterRoles = member.roles.cache
-      .array()
-      .filter((role) =>
-        managedGuild.game.frameCharacterNames.includes(role.name)
-      );
-
-    const areas = currentScene.areaSetups
-      .filter((areaSetup) =>
-        areaSetup.placements.some((placement) =>
-          frameCharacterRoles.some(
-            (role) => role.name === placement.frameCharacter.name
-          )
-        )
-      )
-      .map((areaSetup) => areaSetup.area);
-
-    const availableChoiceVariables = flatMap(currentScene.choices, (choice) => {
-      if (choice.scope === "global") {
-        return managedGuild.game.globalVariables.get(choice.variableId);
-      } else if (choice.scope === "area") {
-        return areas.map((area) => area.variables.get(choice.variableId));
-      }
-    });
-    if (availableChoiceVariables.length === 0) {
-      throw new Error("You don't have any choices available right now.");
-    }
-
-    const availableChoiceValues = flatMap(
-      availableChoiceVariables,
-      (variable: ChoiceVariable) => variable.choices
-    );
-
-    const choiceHelp = `Here are your options:\n${availableChoiceValues
-      .map((choice) => `${choice.value}: ${choice.label}`)
-      .join("\n")}\n\nTo choose one, say something like "!choose ${
-      availableChoiceValues[0].value
-    }".`;
-
-    const choiceArg = args;
-    if (choiceArg === "") {
-      throw new Error(`Please specify a choice.  ${choiceHelp}`);
-    }
-
-    const choice = availableChoiceValues.find(
-      (choiceValue) => choiceValue.value === choiceArg
-    );
-    if (choice == null) {
-      throw new Error(
-        `${choiceArg} is not a valid choice right now.  ${choiceHelp}`
-      );
-    }
-
-    const variable = availableChoiceVariables.find((variable) =>
-      variable?.choices.some(
-        (choiceValue) => choiceValue.value === choice.value
-      )
-    )!;
-
-    await setGameVariableValue(managedGuild, variable, choice.value);
+    const choice = await makeChoice(managedGuild, member, args);
     msg.reply(`Thank you.  Choice recorded: ${choice.label}`);
   },
 };
@@ -247,6 +211,7 @@ export function setupClient(client: Client) {
       try {
         await dispatcher(managedGuild, msg, args);
       } catch (error) {
+        console.error(error);
         msg.reply(error.message);
       }
     }
