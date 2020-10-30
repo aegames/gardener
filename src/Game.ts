@@ -1,19 +1,15 @@
-import { flatMap } from "lodash";
-import { Role } from "discord.js";
+import { flatMap } from 'lodash';
+import { Role } from 'discord.js';
 import {
   BooleanExpression,
   GameStructure,
   loadGameStructure,
   VariableDefinition,
   VariableDefinitionOrTemplateReference,
-} from "./GameStructure";
-import {
-  evaluateBooleanExpression,
-  ResolutionContext,
-  resolveVariable,
-} from "./GameLogic";
-import { ManagedGuild } from "./ManagedGuild";
-import { notEmpty } from "./Utils";
+} from './GameStructure';
+import { evaluateBooleanExpression, ResolutionContext, resolveVariable } from './GameLogic';
+import { ManagedGuild } from './ManagedGuild';
+import { notEmpty } from './Utils';
 
 type VariableBase = {
   id: string;
@@ -21,7 +17,7 @@ type VariableBase = {
 };
 
 export type ChoiceVariable = VariableBase & {
-  type: "choice";
+  type: 'choice';
   choices: {
     value: string;
     label: string;
@@ -57,7 +53,7 @@ export type AreaSetup = {
 
 export type Choice = {
   variableId: string;
-  scope: "area" | "global";
+  scope: 'area' | 'global';
   if?: BooleanExpression;
 };
 
@@ -81,15 +77,12 @@ export type Game = {
 
 type VariableTemplateMap = Map<string, GameVariable[]>;
 
-function parseVariable(
-  definition: VariableDefinition,
-  scope: string
-): GameVariable {
-  if (definition.type === "choice") {
+function parseVariable(definition: VariableDefinition, scope: string): GameVariable {
+  if (definition.type === 'choice') {
     return {
       id: definition.id,
       scope,
-      type: "choice",
+      type: 'choice',
       choices: [...definition.choices],
     };
   } else {
@@ -100,14 +93,12 @@ function parseVariable(
 function parseVariableOrTemplateReference(
   definition: VariableDefinitionOrTemplateReference,
   variableTemplates: VariableTemplateMap,
-  scope: string
+  scope: string,
 ): GameVariable[] {
-  if ("templateId" in definition) {
+  if ('templateId' in definition) {
     const variables = variableTemplates.get(definition.templateId);
     if (variables == null) {
-      throw new Error(
-        `No variable template with id "${definition.templateId}"`
-      );
+      throw new Error(`No variable template with id "${definition.templateId}"`);
     }
     return variables.map((definition) => ({
       ...definition,
@@ -121,12 +112,12 @@ function parseVariableOrTemplateReference(
 function parseVariableOrTemplateReferenceList(
   definitions: VariableDefinitionOrTemplateReference[],
   variableTemplates: VariableTemplateMap,
-  scope: string
+  scope: string,
 ): Map<string, GameVariable> {
   return new Map<string, GameVariable>(
     flatMap(definitions, (varDef) =>
-      parseVariableOrTemplateReference(varDef, variableTemplates, scope)
-    ).map((variable) => [variable.id, variable])
+      parseVariableOrTemplateReference(varDef, variableTemplates, scope),
+    ).map((variable) => [variable.id, variable]),
   );
 }
 
@@ -134,15 +125,13 @@ export function loadGame(structure: GameStructure): Game {
   const variableTemplates: VariableTemplateMap = new Map(
     (structure.variableTemplates ?? []).map((template) => [
       template.id,
-      template.variables.map((definition) =>
-        parseVariable(definition, `template.${template.id}`)
-      ),
-    ])
+      template.variables.map((definition) => parseVariable(definition, `template.${template.id}`)),
+    ]),
   );
   const globalVariables = parseVariableOrTemplateReferenceList(
     structure.globalVariables ?? [],
     variableTemplates,
-    "global"
+    'global',
   );
 
   const areas = new Map<string, Area>(
@@ -153,13 +142,13 @@ export function loadGame(structure: GameStructure): Game {
         variables: parseVariableOrTemplateReferenceList(
           area.variables ?? [],
           variableTemplates,
-          `area.${area.name.toLowerCase().replace(/\W/g, "_")}`
+          `area.${area.name.toLowerCase().replace(/\W/g, '_')}`,
         ),
       },
-    ])
+    ]),
   );
   const frameCharacters = new Map<string, FrameCharacter>(
-    structure.frameCharacters.map((character) => [character.name, character])
+    structure.frameCharacters.map((character) => [character.name, character]),
   );
   const innerCharacters = new Map<string, InnerCharacter>(
     structure.innerCharacters.map((character) => {
@@ -171,12 +160,12 @@ export function loadGame(structure: GameStructure): Game {
         const frameCharacter = frameCharacters.get(fcName);
         if (!frameCharacter) {
           throw new Error(
-            `Inner character ${character.name} references non-existent frame character "${fcName}"`
+            `Inner character ${character.name} references non-existent frame character "${fcName}"`,
           );
         }
         if (frameCharacter.defaultInnerCharacter) {
           throw new Error(
-            `Inner character ${character.name} has a default frame character ${frameCharacter.name}, but that frame character already has ${frameCharacter.defaultInnerCharacter.name} as a default`
+            `Inner character ${character.name} has a default frame character ${frameCharacter.name}, but that frame character already has ${frameCharacter.defaultInnerCharacter.name} as a default`,
           );
         }
         frameCharacter.defaultInnerCharacter = innerCharacter;
@@ -184,7 +173,7 @@ export function loadGame(structure: GameStructure): Game {
       });
 
       return [character.name, innerCharacter];
-    })
+    }),
   );
   const scenes: Scene[] = structure.scenes.map((scene) => ({
     name: scene.name,
@@ -193,33 +182,29 @@ export function loadGame(structure: GameStructure): Game {
       const area = areas.get(areaSetup.areaName);
       if (!area) {
         throw new Error(
-          `Scene ${scene.name} area setup for ${areaSetup.areaName} references non-existent area: "${areaSetup.areaName}"`
+          `Scene ${scene.name} area setup for ${areaSetup.areaName} references non-existent area: "${areaSetup.areaName}"`,
         );
       }
 
       return {
         area,
         placements: areaSetup.placements.map((placement) => {
-          const frameCharacter = frameCharacters.get(
-            placement.frameCharacterName
-          );
+          const frameCharacter = frameCharacters.get(placement.frameCharacterName);
           if (!frameCharacter) {
             throw new Error(
-              `Scene ${scene.name} area setup for ${areaSetup.areaName} references non-existent frame character "${placement.frameCharacterName}"`
+              `Scene ${scene.name} area setup for ${areaSetup.areaName} references non-existent frame character "${placement.frameCharacterName}"`,
             );
           }
-          const icName =
-            placement.innerCharacterName ??
-            frameCharacter.defaultInnerCharacter?.name;
+          const icName = placement.innerCharacterName ?? frameCharacter.defaultInnerCharacter?.name;
           if (!icName) {
             throw new Error(
-              `Scene ${scene.name} area setup for ${areaSetup.areaName} places ${frameCharacter.name} without specifying an innerCharacterName, but ${frameCharacter.name} has no default inner character`
+              `Scene ${scene.name} area setup for ${areaSetup.areaName} places ${frameCharacter.name} without specifying an innerCharacterName, but ${frameCharacter.name} has no default inner character`,
             );
           }
           const innerCharacter = innerCharacters.get(icName);
           if (!innerCharacter) {
             throw new Error(
-              `Scene ${scene.name} area setup for ${areaSetup.areaName} references non-existent inner character "${icName}"`
+              `Scene ${scene.name} area setup for ${areaSetup.areaName} references non-existent inner character "${icName}"`,
             );
           }
           return { frameCharacter, innerCharacter };
@@ -245,16 +230,11 @@ export function parseGame(filename: string) {
   return loadGame(loadGameStructure(filename));
 }
 
-export function findAreaForFrameCharacter(
-  frameCharacterRoles: Role[],
-  scene: Scene
-) {
+export function findAreaForFrameCharacter(frameCharacterRoles: Role[], scene: Scene) {
   return scene.areaSetups.find((areaSetup) =>
     areaSetup.placements.some((placement) =>
-      frameCharacterRoles.some(
-        (role) => role.name === placement.frameCharacter.name
-      )
-    )
+      frameCharacterRoles.some((role) => role.name === placement.frameCharacter.name),
+    ),
   )?.area;
 }
 
@@ -262,15 +242,10 @@ async function resolveSceneChoice(
   managedGuild: ManagedGuild,
   game: Game,
   context: ResolutionContext,
-  choice: Choice
+  choice: Choice,
 ) {
   if (choice.if != null) {
-    const passed = await evaluateBooleanExpression(
-      managedGuild,
-      game,
-      choice.if,
-      context
-    );
+    const passed = await evaluateBooleanExpression(managedGuild, game, choice.if, context);
     if (!passed) {
       return undefined;
     }
@@ -288,12 +263,10 @@ export async function getSceneChoices(
   managedGuild: ManagedGuild,
   game: Game,
   scene: Scene,
-  context: ResolutionContext
+  context: ResolutionContext,
 ): Promise<ChoiceVariable[]> {
   const resolvedVariables = await Promise.all(
-    scene.choices.map((choice) =>
-      resolveSceneChoice(managedGuild, game, context, choice)
-    )
+    scene.choices.map((choice) => resolveSceneChoice(managedGuild, game, context, choice)),
   );
 
   return resolvedVariables.filter(notEmpty);

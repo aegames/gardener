@@ -1,6 +1,6 @@
-import { Pool } from "pg";
-import { Game, GameVariable, Scene } from "./Game";
-import { ManagedGuild } from "./ManagedGuild";
+import { Pool } from 'pg';
+import { Game, GameVariable, Scene } from './Game';
+import { ManagedGuild } from './ManagedGuild';
 
 export const dbPool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -10,13 +10,10 @@ function getQualifiedVariableId(variable: GameVariable) {
   return `${variable.scope}.${variable.id}`;
 }
 
-export async function getGameVariableValue(
-  managedGuild: ManagedGuild,
-  variable: GameVariable
-) {
+export async function getGameVariableValue(managedGuild: ManagedGuild, variable: GameVariable) {
   const result = await dbPool.query(
-    "SELECT value FROM game_variables WHERE guild_id = $1 AND variable_id = $2",
-    [managedGuild.guild.id, getQualifiedVariableId(variable)]
+    'SELECT value FROM game_variables WHERE guild_id = $1 AND variable_id = $2',
+    [managedGuild.guild.id, getQualifiedVariableId(variable)],
   );
 
   if (result.rowCount === 0) {
@@ -29,7 +26,7 @@ export async function getGameVariableValue(
 export function setGameVariableValue(
   managedGuild: ManagedGuild,
   variable: GameVariable,
-  value: any
+  value: any,
 ) {
   const jsonValue = JSON.stringify(value);
 
@@ -39,20 +36,14 @@ export function setGameVariableValue(
     ON CONFLICT (guild_id, variable_id)
     DO
       UPDATE SET value = $4`,
-    [
-      managedGuild.guild.id,
-      getQualifiedVariableId(variable),
-      jsonValue,
-      jsonValue,
-    ]
+    [managedGuild.guild.id, getQualifiedVariableId(variable), jsonValue, jsonValue],
   );
 }
 
 export async function getGameScene(managedGuild: ManagedGuild, game: Game) {
-  const result = await dbPool.query(
-    "SELECT scene_name FROM game_states WHERE guild_id = $1",
-    [managedGuild.guild.id]
-  );
+  const result = await dbPool.query('SELECT scene_name FROM game_states WHERE guild_id = $1', [
+    managedGuild.guild.id,
+  ]);
 
   if (result.rowCount === 0) {
     return undefined;
@@ -73,6 +64,6 @@ export function setGameScene(managedGuild: ManagedGuild, scene?: Scene) {
     ON CONFLICT (guild_id)
     DO
       UPDATE SET scene_name = $3`,
-    [managedGuild.guild.id, scene?.name, scene?.name]
+    [managedGuild.guild.id, scene?.name, scene?.name],
   );
 }

@@ -1,14 +1,14 @@
-import * as z from "zod";
-import fs from "fs";
+import * as z from 'zod';
+import fs from 'fs';
 
 const ChoiceVariableDefinitionSchema = z.object({
   id: z.string(),
-  type: z.literal("choice"),
+  type: z.literal('choice'),
   choices: z.array(
     z.object({
       value: z.string(),
       label: z.string(),
-    })
+    }),
   ),
 });
 
@@ -25,7 +25,7 @@ export type VariableDefinitionOrTemplateReference = z.infer<
   typeof VariableDefinitionOrTemplateReferenceSchema
 >;
 
-const VariableScopeSchema = z.union([z.literal("area"), z.literal("global")]);
+const VariableScopeSchema = z.union([z.literal('area'), z.literal('global')]);
 export type VariableScope = z.infer<typeof VariableScopeSchema>;
 
 const VariableReferenceSchema = z.object({
@@ -69,7 +69,7 @@ const BooleanExpressionSchema: z.ZodType<BooleanExpression> = z.lazy(() =>
       or: z.tuple([BooleanExpressionSchema, BooleanExpressionSchema]),
     }),
     z.object({ not: BooleanExpressionSchema }),
-  ])
+  ]),
 );
 
 const ChoiceSchema = z.object({
@@ -84,30 +84,26 @@ const GameStructureSchema = z.object({
       z.object({
         id: z.string(),
         variables: z.array(VariableDefinitionSchema),
-      })
-    )
+      }),
+    ),
   ),
-  globalVariables: z.optional(
-    z.array(VariableDefinitionOrTemplateReferenceSchema)
-  ),
+  globalVariables: z.optional(z.array(VariableDefinitionOrTemplateReferenceSchema)),
   areas: z.array(
     z.object({
       name: z.string(),
-      variables: z.optional(
-        z.array(VariableDefinitionOrTemplateReferenceSchema)
-      ),
-    })
+      variables: z.optional(z.array(VariableDefinitionOrTemplateReferenceSchema)),
+    }),
   ),
   frameCharacters: z.array(
     z.object({
       name: z.string(),
-    })
+    }),
   ),
   innerCharacters: z.array(
     z.object({
       name: z.string(),
       defaultFrameCharacterNames: z.optional(z.array(z.string())),
-    })
+    }),
   ),
   scenes: z.array(
     z.object({
@@ -120,18 +116,16 @@ const GameStructureSchema = z.object({
             z.object({
               frameCharacterName: z.string(),
               innerCharacterName: z.ostring(),
-            })
+            }),
           ),
-        })
+        }),
       ),
-    })
+    }),
   ),
 });
 
 export type GameStructure = z.infer<typeof GameStructureSchema>;
 
 export function loadGameStructure(filename: string) {
-  return GameStructureSchema.parse(
-    JSON.parse(fs.readFileSync(filename).toString("utf-8"))
-  );
+  return GameStructureSchema.parse(JSON.parse(fs.readFileSync(filename).toString('utf-8')));
 }

@@ -1,29 +1,10 @@
-import {
-  Channel,
-  Client,
-  Guild,
-  GuildChannel,
-  Message,
-  Role,
-} from "discord.js";
-import { flatMap } from "lodash";
-import {
-  getAvailableChoicesForMember,
-  getFrameCharacterRoles,
-  makeChoice,
-  prepNextScene,
-  prepScene,
-} from "./Commands";
-import { getGameScene, setGameVariableValue } from "./Database";
-import {
-  ChoiceVariable,
-  findAreaForFrameCharacter,
-  Game,
-  getSceneChoices,
-} from "./Game";
+import { Channel, Client, Guild, GuildChannel, Message, Role } from 'discord.js';
+import { makeChoice, prepNextScene, prepScene } from './Commands';
+import { Game } from './Game';
 
 export type ManagedGuild = {
-  areaChannels: Map<string, GuildChannel>;
+  areaTextChannels: Map<string, GuildChannel>;
+  areaVoiceChannels: Map<string, GuildChannel>;
   frameCharacterRoles: Map<string, Role>;
   game: Game;
   guild: Guild;
@@ -37,60 +18,83 @@ function findMissing<T>(expected: T[], actual: Map<T, any>) {
   return expected.filter((item) => !actual.has(item));
 }
 
+function getAreaTextChannelName(areaName: string) {
+  return areaName.toLowerCase().replace(/\W+/g, '-');
+}
+
+export function getAreaTextChannel(managedGuild: ManagedGuild, areaName: string) {
+  return managedGuild.areaTextChannels.get(getAreaTextChannelName(areaName));
+}
+
+export function getAreaVoiceChannel(managedGuild: ManagedGuild, areaName: string) {
+  return managedGuild.areaVoiceChannels.get(areaName);
+}
+
 function checkReadyToPlay(managedGuild: ManagedGuild) {
   const { guild, game } = managedGuild;
-  const missingAreaChannels = findMissing(
+  const missingAreaTextChannels = findMissing(
     game.areaNames,
-    managedGuild.areaChannels ?? new Map<string, GuildChannel>()
+    managedGuild.areaTextChannels ?? new Map<string, GuildChannel>(),
+  );
+  const missingAreaVoiceChannels = findMissing(
+    game.areaNames,
+    managedGuild.areaVoiceChannels ?? new Map<string, GuildChannel>(),
   );
   const missingInnerCharacterRoles = findMissing(
     game.innerCharacterNames,
-    managedGuild.innerCharacterRoles ?? new Map<string, Role>()
+    managedGuild.innerCharacterRoles ?? new Map<string, Role>(),
   );
   const missingFrameCharacterRoles = findMissing(
     game.frameCharacterNames,
-    managedGuild.frameCharacterRoles ?? new Map<string, Role>()
+    managedGuild.frameCharacterRoles ?? new Map<string, Role>(),
   );
-  const missingRoles = [
-    ...missingInnerCharacterRoles,
-    ...missingFrameCharacterRoles,
-  ];
+  const missingRoles = [...missingInnerCharacterRoles, ...missingFrameCharacterRoles];
 
   let errors: string[] = [];
-  if (missingAreaChannels.length > 0) {
-    errors.push(
-      `Missing voice channels for ${missingAreaChannels.join(", ")}!`
-    );
+  if (missingAreaTextChannels.length > 0) {
+    errors.push(`Missing text channels for ${missingAreaTextChannels.join(', ')}!`);
+  }
+  if (missingAreaVoiceChannels.length > 0) {
+    errors.push(`Missing voice channels for ${missingAreaVoiceChannels.join(', ')}!`);
   }
   if (missingRoles.length > 0) {
-    errors.push(`Missing roles for ${missingRoles.join(", ")}!`);
+    errors.push(`Missing roles for ${missingRoles.join(', ')}!`);
   }
 
   if (errors.length > 0) {
     guild.systemChannel?.send(
-      [...errors, "Can't start game until these errors are fixed."].join("\n")
+      [...errors, "Can't start game until these errors are fixed."].join('\n'),
     );
     managedGuild.readyToPlay = false;
   } else {
     if (!managedGuild.readyToPlay) {
-      guild.systemChannel?.send("Errors corrected!  Ready to play.");
+      guild.systemChannel?.send('Errors corrected!  Ready to play.');
     }
     console.log(`${guild.name} is ready to play`);
     managedGuild.readyToPlay = true;
   }
 }
 
-function loadAreaChannelsForGuild(managedGuild: ManagedGuild) {
-  const areaChannels = new Map<string, GuildChannel>();
-  managedGuild.guild.channels.cache
-    .filter((channel) => channel.type === "voice")
-    .forEach((channel) => {
-      const channelName = channel.name;
-      if (managedGuild.game.areaNames.includes(channelName)) {
-        areaChannels.set(channelName, channel);
-      }
-    });
-  managedGuild.areaChannels = areaChannels;
+function loadAreaChannelsForGuild(managedGuild: ManagedGuild, game: Game) {
+  const areaTextChannels = new Map<string, GuildChannel>();
+  const areaVoiceChannels = new Map<string, GuildChannel>();
+
+  const areas = [...game.areas.values()];
+  const areaNames = new Set(areas.map((area) => area.name));
+  const areaNameByTextChannelName = new Map(
+    areas.map((area) => [getAreaTextChannelName(area.name), area.name]),
+  );
+
+  managedGuild.guild.channels.cache.forEach((channel) => {
+    const channelName = channel.name;
+    if (channel.type === 'voice' && areaNames.has(channelName)) {
+      areaVoiceChannels.set(channelName, channel);
+    } else if (channel.type === 'text' && areaNameByTextChannelName.has(channelName)) {
+      areaTextChannels.set(areaNameByTextChannelName.get(channelName)!, channel);
+    }
+  });
+  managedGuild.areaTextChannels = areaTextChannels;
+  managedGuild.areaVoiceChannels = areaVoiceChannels;
 }
 
 async function loadRolesForGuild(managedGuild: ManagedGuild) {
@@ -111,14 +115,14 @@ async function loadRolesForGuild(managedGuild: ManagedGuild) {
 }
 
 function channelIsGuildChannel(channel: Channel): channel is GuildChannel {
-  return "guild" in channel;
+  return 'guild' in channel;
 }
 
 function maybeLoadGuildChannels(channel: Channel) {
-  if (channelIsGuildChannel(channel) && channel.type === "voice") {
+  if (channelIsGuildChannel(channel)) {
     const managedGuild = managedGuildsByGuildId.get(channel.guild.id);
     if (managedGuild) {
-      loadAreaChannelsForGuild(managedGuild);
+      loadAreaChannelsForGuild(managedGuild, managedGuild.game);
       checkReadyToPlay(managedGuild);
     }
   }
@@ -135,26 +139,24 @@ async function roleChanged(role: Role) {
 type CommandDispatcher = (
   managedGuild: ManagedGuild,
   msg: Message,
-  args: string
+  args: string,
 ) => Promise<any> | void;
 
 const commandDispatchers: Record<string, CommandDispatcher> = {
   list: (managedGuild: ManagedGuild, msg: Message) => {
     msg.reply(
       managedGuild.guild.channels.cache
-        .filter((channel) => channel.type === "voice")
+        .filter((channel) => channel.type === 'voice')
         .map((channel) => channel.name)
-        .join(", ")
+        .join(', '),
     );
   },
   prep: async (managedGuild: ManagedGuild, msg: Message, args: string) => {
-    if (args === "next") {
+    if (args === 'next') {
       const scene = await prepNextScene(managedGuild);
       msg.reply(`Prepped ${scene.name}`);
     } else {
-      const scene = managedGuild.game.scenes.find(
-        (scene) => scene.name === args
-      );
+      const scene = managedGuild.game.scenes.find((scene) => scene.name === args);
       if (scene) {
         await prepScene(managedGuild, managedGuild.game.scenes[0]);
         msg.reply(`Prepped ${scene.name}`);
@@ -162,7 +164,7 @@ const commandDispatchers: Record<string, CommandDispatcher> = {
         msg.reply(
           `Invalid command.  To prep a scene, you can say:\n!prep next (for the next scene)\n${managedGuild.game.scenes
             .map((scene) => `!prep ${scene.name}`)
-            .join("\n")}`
+            .join('\n')}`,
         );
       }
     }
@@ -179,14 +181,14 @@ const commandDispatchers: Record<string, CommandDispatcher> = {
 };
 
 export function setupClient(client: Client) {
-  client.on("channelCreate", maybeLoadGuildChannels);
-  client.on("channelUpdate", maybeLoadGuildChannels);
-  client.on("channelDelete", maybeLoadGuildChannels);
-  client.on("roleCreate", roleChanged);
-  client.on("roleUpdate", roleChanged);
-  client.on("roleDelete", roleChanged);
+  client.on('channelCreate', maybeLoadGuildChannels);
+  client.on('channelUpdate', maybeLoadGuildChannels);
+  client.on('channelDelete', maybeLoadGuildChannels);
+  client.on('roleCreate', roleChanged);
+  client.on('roleUpdate', roleChanged);
+  client.on('roleDelete', roleChanged);
 
-  client.on("message", async (msg) => {
+  client.on('message', async (msg) => {
     if (!msg.guild) {
       return;
     }
@@ -202,7 +204,7 @@ export function setupClient(client: Client) {
     }
 
     const command = match[1].toLowerCase();
-    const args = match[2]?.trim() ?? "";
+    const args = match[2]?.trim() ?? '';
 
     console.log(`>> ${msg.member?.user.tag}: ${msg.content}`);
 
@@ -222,14 +224,15 @@ export async function bringGuildUnderManagement(guild: Guild, game: Game) {
   const managedGuild: ManagedGuild = {
     guild,
     game,
-    areaChannels: new Map<string, GuildChannel>(),
+    areaTextChannels: new Map<string, GuildChannel>(),
+    areaVoiceChannels: new Map<string, GuildChannel>(),
     frameCharacterRoles: new Map<string, Role>(),
     innerCharacterRoles: new Map<string, Role>(),
     readyToPlay: true,
   };
   managedGuildsByGuildId.set(guild.id, managedGuild);
 
-  loadAreaChannelsForGuild(managedGuild);
+  loadAreaChannelsForGuild(managedGuild, game);
   await loadRolesForGuild(managedGuild);
   checkReadyToPlay(managedGuild);
 }
