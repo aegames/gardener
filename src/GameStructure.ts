@@ -94,28 +94,31 @@ const GameStructureSchema = z.object({
       variables: z.optional(z.array(VariableDefinitionOrTemplateReferenceSchema)),
     }),
   ),
-  frameCharacters: z.array(
+  characterTypes: z.array(
     z.object({
       name: z.string(),
+      primary: z.optional(z.boolean()),
     }),
   ),
-  innerCharacters: z.array(
+  characters: z.array(
     z.object({
       name: z.string(),
-      defaultFrameCharacterNames: z.optional(z.array(z.string())),
+      type: z.string(),
+      defaultPrimaryCharacterNames: z.optional(z.array(z.string())),
     }),
   ),
   scenes: z.array(
     z.object({
       name: z.string(),
+      characterType: z.string(),
       choices: z.optional(z.array(ChoiceSchema)),
       areaSetups: z.array(
         z.object({
           areaName: z.string(),
           placements: z.array(
             z.object({
-              frameCharacterName: z.string(),
-              innerCharacterName: z.ostring(),
+              characterName: z.string(),
+              secondaryCharacterName: z.ostring(),
             }),
           ),
         }),

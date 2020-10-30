@@ -31,28 +31,32 @@ export type Area = {
   variables: Map<string, GameVariable>;
 };
 
-export type FrameCharacter = {
+export type CharacterType = {
   name: string;
-  defaultInnerCharacter?: InnerCharacter;
+  primary: boolean;
 };
 
-export type InnerCharacter = {
+export type Character = {
   name: string;
-  defaultFrameCharacters: FrameCharacter[];
+  type: CharacterType;
+  defaultPrimaryCharacters: Character[];
+  defaultSecondaryCharacter?: Character;
 };
 
 export type Placement = {
-  frameCharacter: FrameCharacter;
-  innerCharacter: InnerCharacter;
+  primaryCharacter: Character;
+  secondaryCharacter?: Character;
 };
 
 export type AreaSetup = {
   area: Area;
+  scene: Scene;
   placements: Placement[];
 };
 
 export type Choice = {
   variableId: string;
+  scene: Scene;
   scope: 'area' | 'global';
   if?: BooleanExpression;
 };
@@ -60,17 +64,16 @@ export type Choice = {
 export type Scene = {
   name: string;
   choices: Choice[];
+  characterType: CharacterType;
   areaSetups: AreaSetup[];
 };
 
 export type Game = {
   areas: Map<string, Area>;
   areaNames: string[];
-  frameCharacters: Map<string, FrameCharacter>;
-  frameCharacterNames: string[];
+  characters: Map<string, Character>;
+  characterTypes: Map<string, CharacterType>;
   globalVariables: Map<string, GameVariable>;
-  innerCharacters: Map<string, InnerCharacter>;
-  innerCharacterNames: string[];
   scenes: Scene[];
   sceneNames: string[];
 };
@@ -147,80 +150,125 @@ export function loadGame(structure: GameStructure): Game {
       },
     ]),
   );
-  const frameCharacters = new Map<string, FrameCharacter>(
-    structure.frameCharacters.map((character) => [character.name, character]),
+  const characterTypes = new Map<string, CharacterType>(
+    structure.characterTypes.map((characterType) => [
+      characterType.name,
+      { ...characterType, primary: characterType.primary ?? false },
+    ]),
   );
-  const innerCharacters = new Map<string, InnerCharacter>(
-    structure.innerCharacters.map((character) => {
-      const innerCharacter: InnerCharacter = {
-        name: character.name,
-        defaultFrameCharacters: [],
+  const characters = new Map<string, Character>(
+    structure.characters.map((characterData) => {
+      const characterType = characterTypes.get(characterData.type);
+      if (!characterType) {
+        throw new Error(
+          `Character ${characterData.name} references non-existent character type "${characterData.type}"`,
+        );
+      }
+      const character: Character = {
+        name: characterData.name,
+        type: characterType,
+        defaultPrimaryCharacters: [],
       };
-      (character.defaultFrameCharacterNames ?? []).forEach((fcName) => {
-        const frameCharacter = frameCharacters.get(fcName);
-        if (!frameCharacter) {
-          throw new Error(
-            `Inner character ${character.name} references non-existent frame character "${fcName}"`,
-          );
-        }
-        if (frameCharacter.defaultInnerCharacter) {
-          throw new Error(
-            `Inner character ${character.name} has a default frame character ${frameCharacter.name}, but that frame character already has ${frameCharacter.defaultInnerCharacter.name} as a default`,
-          );
-        }
-        frameCharacter.defaultInnerCharacter = innerCharacter;
-        innerCharacter.defaultFrameCharacters.push(frameCharacter);
-      });
-
-      return [character.name, innerCharacter];
+      return [character.name, character];
     }),
   );
-  const scenes: Scene[] = structure.scenes.map((scene) => ({
-    name: scene.name,
-    choices: scene.choices ?? [],
-    areaSetups: scene.areaSetups.map((areaSetup) => {
+  structure.characters.forEach((characterData) => {
+    (characterData.defaultPrimaryCharacterNames ?? []).forEach((pcName) => {
+      const primaryCharacter = characters.get(pcName);
+      const secondaryCharacter = characters.get(characterData.name)!;
+      if (!primaryCharacter) {
+        throw new Error(
+          `Secondary character ${secondaryCharacter.name} references non-existent primary character "${pcName}"`,
+        );
+      }
+      if (primaryCharacter.defaultSecondaryCharacter) {
+        throw new Error(
+          `Secondary character ${secondaryCharacter.name} specifies ${primaryCharacter.name} as default primary character, but they already have ${primaryCharacter.defaultSecondaryCharacter.name} as a default secondary character`,
+        );
+      }
+      secondaryCharacter.defaultPrimaryCharacters.push(primaryCharacter);
+      primaryCharacter.defaultSecondaryCharacter = secondaryCharacter;
+    });
+  });
+  const scenes: Scene[] = structure.scenes.map((sceneData) => {
+    const characterType = characterTypes.get(sceneData.characterType);
+    if (!characterType) {
+      throw new Error(
+        `Scene ${sceneData.name} references non-existent character type "${characterType}"`,
+      );
+    }
+    const scene: Scene = {
+      name: sceneData.name,
+      characterType,
+      choices: [],
+      areaSetups: [],
+    };
+
+    scene.areaSetups = sceneData.areaSetups.map((areaSetup) => {
+      const errorHeader = `Scene ${sceneData.name} area setup for ${areaSetup.areaName}`;
       const area = areas.get(areaSetup.areaName);
       if (!area) {
-        throw new Error(
-          `Scene ${scene.name} area setup for ${areaSetup.areaName} references non-existent area: "${areaSetup.areaName}"`,
-        );
+        throw new Error(`${errorHeader} references non-existent area: "${areaSetup.areaName}"`);
       }
 
       return {
         area,
+        scene,
         placements: areaSetup.placements.map((placement) => {
-          const frameCharacter = frameCharacters.get(placement.frameCharacterName);
-          if (!frameCharacter) {
+          const primaryCharacter = characters.get(placement.characterName);
+          if (!primaryCharacter) {
             throw new Error(
-              `Scene ${scene.name} area setup for ${areaSetup.areaName} references non-existent frame character "${placement.frameCharacterName}"`,
+              `${errorHeader} references non-existent character "${placement.characterName}"`,
             );
           }
-          const icName = placement.innerCharacterName ?? frameCharacter.defaultInnerCharacter?.name;
-          if (!icName) {
-            throw new Error(
-              `Scene ${scene.name} area setup for ${areaSetup.areaName} places ${frameCharacter.name} without specifying an innerCharacterName, but ${frameCharacter.name} has no default inner character`,
-            );
+
+          if (scene.characterType.primary) {
+            if (!primaryCharacter.type.primary) {
+              throw new Error(
+                `${errorHeader} references secondary character ${primaryCharacter.name}, but ${scene.name} is a primary-character scene`,
+              );
+            }
+
+            return { primaryCharacter };
+          } else {
+            const scName =
+              placement.secondaryCharacterName ?? primaryCharacter.defaultSecondaryCharacter?.name;
+            if (!scName) {
+              throw new Error(
+                `${errorHeader} places ${primaryCharacter.name} without specifying a secondaryCharacterName, but ${primaryCharacter.name} has no default secondary character`,
+              );
+            }
+            const secondaryCharacter = characters.get(scName);
+            if (!secondaryCharacter) {
+              throw new Error(
+                `${errorHeader} references non-existent secondary character "${scName}"`,
+              );
+            }
+            if (secondaryCharacter.type.primary) {
+              throw new Error(
+                `${errorHeader} specifies ${secondaryCharacter.name} as a secondary character, but they are a primary character`,
+              );
+            }
+            return { primaryCharacter, secondaryCharacter };
           }
-          const innerCharacter = innerCharacters.get(icName);
-          if (!innerCharacter) {
-            throw new Error(
-              `Scene ${scene.name} area setup for ${areaSetup.areaName} references non-existent inner character "${icName}"`,
-            );
-          }
-          return { frameCharacter, innerCharacter };
         }),
       };
-    }),
-  }));
+    });
+
+    scene.choices = (sceneData.choices ?? []).map((choiceData) => ({
+      ...choiceData,
+      scene,
+    }));
+
+    return scene;
+  });
 
   return {
     areas,
     areaNames: [...areas.keys()],
-    frameCharacters,
-    frameCharacterNames: [...frameCharacters.keys()],
+    characterTypes,
+    characters,
     globalVariables,
-    innerCharacters,
-    innerCharacterNames: [...innerCharacters.keys()],
     scenes,
     sceneNames: scenes.map((scene) => scene.name),
   };
@@ -230,11 +278,9 @@ export function parseGame(filename: string) {
   return loadGame(loadGameStructure(filename));
 }
 
-export function findAreaForFrameCharacter(frameCharacterRoles: Role[], scene: Scene) {
+export function findAreaForPrimaryCharacterRole(role: Role, scene: Scene) {
   return scene.areaSetups.find((areaSetup) =>
-    areaSetup.placements.some((placement) =>
-      frameCharacterRoles.some((role) => role.name === placement.frameCharacter.name),
-    ),
+    areaSetup.placements.some((placement) => role.name === placement.primaryCharacter.name),
   )?.area;
 }
 

@@ -1,45 +1,108 @@
 import { GuildChannel, GuildMember, OverwriteResolvable, Role } from 'discord.js';
 import { flatMap, flatten } from 'lodash';
 import { getGameScene, setGameScene, setGameVariableValue } from './database';
-import { Area, AreaSetup, findAreaForFrameCharacter, Game, getSceneChoices, Scene } from './game';
-import type { ManagedGuild } from './managedGuild';
+import {
+  Area,
+  AreaSetup,
+  findAreaForPrimaryCharacterRole,
+  Game,
+  getSceneChoices,
+  Scene,
+} from './game';
+import { loadRolesForGuild, ManagedGuild } from './managedGuild';
 import { notEmpty } from './utils';
+
+export type PlacementResult = {
+  member: GuildMember;
+  nicknameChanged: boolean;
+  nicknameChangeError?: Error;
+  voiceChannelJoined: boolean;
+  voiceChannelJoinError?: Error;
+};
 
 async function placeCharacter(
   voiceChannel: GuildChannel,
-  frameRole: Role,
-  innerRole: Role,
+  primaryRole: Role,
+  secondaryRole: Role | undefined,
   game: Game,
-) {
-  if (frameRole.members.size === 0) {
-    console.warn(`No player for ${frameRole.name}`);
+): Promise<PlacementResult[]> {
+  if (primaryRole.members.size === 0) {
+    console.warn(`No player for ${primaryRole.name}`);
   }
 
-  const promises = frameRole.members.array().map(async (member) => {
-    const extraRoles = member.roles.cache.filter(
-      (role) => game.innerCharacterNames.includes(role.name) && role.name !== innerRole.name,
-    );
+  const promises = primaryRole.members.array().map(async (member) => {
+    const rolesToAdd = secondaryRole ? [secondaryRole] : [];
+
+    const rolesToRemove = member.roles.cache.filter((role) => {
+      const character = game.characters.get(role.name);
+      if (!character || character.type.primary) {
+        // never remove a primary character role
+        return false;
+      }
+
+      return !secondaryRole || role.name !== secondaryRole.name;
+    });
 
     console.log(
-      `Giving ${member.user.tag} ${innerRole.name}, moving to ${voiceChannel.name}${
-        extraRoles.size > 0 ? `removing ${extraRoles.map((role) => role.name).join(', ')}` : ''
+      `Giving ${member.user.tag} ${rolesToAdd.map((role) => role.name).join(', ')}, moving to ${
+        voiceChannel.name
+      }${
+        rolesToRemove.size > 0
+          ? `, removing ${rolesToRemove.map((role) => role.name).join(', ')}`
+          : ''
       }`,
     );
 
     await Promise.all([
-      member.roles.add(innerRole),
-      ...extraRoles.map((role) => member.roles.remove(role)),
+      ...rolesToAdd.map((role) => member.roles.add(role)),
+      ...rolesToRemove.map((role) => member.roles.remove(role)),
     ]);
+
+    const result: PrepSceneResults['areaSetupResults'][0]['placementResults'][0] = {
+      member,
+      nicknameChanged: false,
+      nicknameChangeError: undefined,
+      voiceChannelJoined: false,
+      voiceChannelJoinError: undefined,
+    };
+
+    try {
+      await member.setNickname(
+        secondaryRole ? `${secondaryRole.name} (${primaryRole.name})` : primaryRole.name,
+      );
+      result.nicknameChanged = true;
+    } catch (error) {
+      result.nicknameChangeError = error;
+    }
 
     try {
       await member.voice.setChannel(voiceChannel);
-      return { member, voiceChannelJoined: true };
+      result.voiceChannelJoined = true;
     } catch (error) {
-      return { member, voiceChannelJoined: false, voiceChannelJoinError: error };
+      result.voiceChannelJoinError = error;
     }
+
+    return result;
   });
 
   return await Promise.all(promises);
+}
+
+async function lockArea(managedGuild: ManagedGuild, area: Area) {
+  const voiceChannel = managedGuild.areaVoiceChannels.get(area.name);
+  const textChannel = managedGuild.areaTextChannels.get(area.name);
+  if (!voiceChannel || !textChannel) {
+    return Promise.reject(new Error(`Missing voice or text channel for area ${area.name}`));
+  }
+
+  const permissionOverwrites: OverwriteResolvable[] = [
+    { id: managedGuild.guild.id, deny: ['VIEW_CHANNEL'] },
+  ];
+
+  return await Promise.all([
+    voiceChannel.overwritePermissions(permissionOverwrites),
+    textChannel.overwritePermissions(permissionOverwrites),
+  ]);
 }
 
 async function setupArea(managedGuild: ManagedGuild, areaSetup: AreaSetup) {
@@ -51,13 +114,16 @@ async function setupArea(managedGuild: ManagedGuild, areaSetup: AreaSetup) {
     );
   }
 
-  const frameRoles = areaSetup.placements
-    .map((placement) => managedGuild.frameCharacterRoles.get(placement.frameCharacter.name))
+  // Refresh roles in case they changed
+  await loadRolesForGuild(managedGuild);
+
+  const primaryRoles = areaSetup.placements
+    .map((placement) => managedGuild.characterRoles.get(placement.primaryCharacter.name))
     .filter(notEmpty);
 
   const permissionOverwrites: OverwriteResolvable[] = [
     { id: managedGuild.guild.id, deny: ['VIEW_CHANNEL'] },
-    ...frameRoles.map((role) => ({ id: role.id, allow: ['VIEW_CHANNEL'] as const })),
+    ...primaryRoles.map((role) => ({ id: role.id, allow: ['VIEW_CHANNEL'] as const })),
   ];
 
   await Promise.all([
@@ -66,20 +132,24 @@ async function setupArea(managedGuild: ManagedGuild, areaSetup: AreaSetup) {
   ]);
 
   const placementPromises = flatMap(areaSetup.placements, (placement) => {
-    const frameRole = managedGuild.frameCharacterRoles.get(placement.frameCharacter.name);
-    if (!frameRole) {
+    const primaryRole = managedGuild.characterRoles.get(placement.primaryCharacter.name);
+    if (!primaryRole) {
       return Promise.reject(
-        new Error(`No role for frame character ${placement.frameCharacter.name}`),
+        new Error(`No role for frame character ${placement.primaryCharacter.name}`),
       );
     }
-    const innerRole = managedGuild.innerCharacterRoles.get(placement.innerCharacter.name);
-    if (!innerRole) {
-      return Promise.reject(
-        new Error(`No role for inner character ${placement.innerCharacter.name}`),
-      );
-    }
+    if (placement.secondaryCharacter) {
+      const secondaryRole = managedGuild.characterRoles.get(placement.secondaryCharacter.name);
+      if (!secondaryRole) {
+        return Promise.reject(
+          new Error(`No role for inner character ${placement.secondaryCharacter.name}`),
+        );
+      }
 
-    return [placeCharacter(voiceChannel, frameRole, innerRole, managedGuild.game)];
+      return [placeCharacter(voiceChannel, primaryRole, secondaryRole, managedGuild.game)];
+    } else {
+      return [placeCharacter(voiceChannel, primaryRole, undefined, managedGuild.game)];
+    }
   });
 
   const placementResults = await Promise.all(placementPromises);
@@ -90,11 +160,7 @@ export type PrepSceneResults = {
   scene: Scene;
   areaSetupResults: {
     area: Area;
-    placementResults: {
-      member: GuildMember;
-      voiceChannelJoined: boolean;
-      voiceChannelJoinError?: Error;
-    }[];
+    placementResults: PlacementResult[];
   }[];
 };
 
@@ -103,9 +169,15 @@ export async function prepScene(
   scene: Scene,
 ): Promise<PrepSceneResults> {
   await setGameScene(managedGuild, scene);
-  const areaSetupResults = await Promise.all(
-    (scene.areaSetups ?? []).map((areaSetup) => setupArea(managedGuild, areaSetup)),
+  const areaSetups = scene.areaSetups ?? [];
+  const areaNames = new Set(areaSetups.map((areaSetup) => areaSetup.area.name));
+  const unusedAreas = [...managedGuild.game.areas.values()].filter(
+    (area) => !areaNames.has(area.name),
   );
+  const areaSetupResults = await Promise.all<any>([
+    ...areaSetups.map((areaSetup) => setupArea(managedGuild, areaSetup)),
+    ...unusedAreas.map((area) => lockArea(managedGuild, area)),
+  ]);
   return { scene, areaSetupResults };
 }
 
@@ -126,8 +198,8 @@ export async function prepNextScene(managedGuild: ManagedGuild) {
   return await prepScene(managedGuild, nextScene);
 }
 
-export function getFrameCharacterRoles(member: GuildMember, game: Game) {
-  return member.roles.cache.array().filter((role) => game.frameCharacterNames.includes(role.name));
+export function getPrimaryCharacterRole(member: GuildMember, game: Game) {
+  return member.roles.cache.array().find((role) => game.characters.get(role.name)?.type.primary);
 }
 
 export async function getAvailableChoicesForMember(
@@ -139,8 +211,14 @@ export async function getAvailableChoicesForMember(
     throw new Error("Choices can only be made in a scene, and the game currently isn't in one");
   }
 
-  const frameCharacterRoles = getFrameCharacterRoles(member, managedGuild.game);
-  const area = findAreaForFrameCharacter(frameCharacterRoles, currentScene);
+  const primaryRole = getPrimaryCharacterRole(member, managedGuild.game);
+  if (!primaryRole) {
+    throw new Error(
+      "You don't have a primary character role assigned, so you can't make choices.  This is probably a mistake, please ask the GM about this.",
+    );
+  }
+
+  const area = findAreaForPrimaryCharacterRole(primaryRole, currentScene);
   const availableChoiceVariables = await getSceneChoices(
     managedGuild,
     managedGuild.game,

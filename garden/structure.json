@@ -1,6 +1,9 @@
 {
   "areas": [
     {
+      "name": "The Funeral Home"
+    },
+    {
       "name": "Area 1",
       "variables": [{ "templateId": "timelineState" }]
     },
@@ -90,47 +93,79 @@
       ]
     }
   ],
-  "frameCharacters": [
-    { "name": "Devon" },
-    { "name": "Faith" },
-    { "name": "Jessica" },
-    { "name": "Kathy" },
-    { "name": "Larry" },
-    { "name": "Lindsay" },
-    { "name": "Lily" },
-    { "name": "Milo" },
-    { "name": "Noah" },
-    { "name": "Patrick" },
-    { "name": "Paula" },
-    { "name": "Rick" }
+  "characterTypes": [
+    { "name": "frame", "primary": true },
+    { "name": "inner" }
   ],
-  "innerCharacters": [
+  "characters": [
+    { "name": "Devon", "type": "frame" },
+    { "name": "Faith", "type": "frame" },
+    { "name": "Jessica", "type": "frame" },
+    { "name": "Kathy", "type": "frame" },
+    { "name": "Larry", "type": "frame" },
+    { "name": "Lindsay", "type": "frame" },
+    { "name": "Lily", "type": "frame" },
+    { "name": "Milo", "type": "frame" },
+    { "name": "Noah", "type": "frame" },
+    { "name": "Patrick", "type": "frame" },
+    { "name": "Paula", "type": "frame" },
+    { "name": "Rick", "type": "frame" },
     {
       "name": "Barbara",
-      "defaultFrameCharacterNames": ["Kathy", "Lindsay", "Faith"]
+      "type": "inner",
+      "defaultPrimaryCharacterNames": ["Kathy", "Lindsay", "Faith"]
     },
     {
       "name": "Virginia",
-      "defaultFrameCharacterNames": ["Jessica", "Lily", "Paula"]
+      "type": "inner",
+      "defaultPrimaryCharacterNames": ["Jessica", "Lily", "Paula"]
     },
     {
       "name": "William",
-      "defaultFrameCharacterNames": ["Milo", "Devon", "Rick"]
+      "type": "inner",
+      "defaultPrimaryCharacterNames": ["Milo", "Devon", "Rick"]
     },
     {
       "name": "Charles",
-      "defaultFrameCharacterNames": ["Larry", "Patrick", "Noah"]
+      "type": "inner",
+      "defaultPrimaryCharacterNames": ["Larry", "Patrick", "Noah"]
     },
     {
-      "name": "Stephanie"
+      "name": "Stephanie",
+      "type": "inner"
     },
     {
-      "name": "Zach"
+      "name": "Zach",
+      "type": "inner"
     }
   ],
   "scenes": [
     {
+      "name": "Prologue",
+      "characterType": "frame",
+      "areaSetups": [
+        {
+          "areaName": "The Funeral Home",
+          "placements": [
+            { "characterName": "Faith" },
+            { "characterName": "Jessica" },
+            { "characterName": "Larry" },
+            { "characterName": "Milo" },
+            { "characterName": "Devon" },
+            { "characterName": "Kathy" },
+            { "characterName": "Lily" },
+            { "characterName": "Patrick" },
+            { "characterName": "Lindsay" },
+            { "characterName": "Noah" },
+            { "characterName": "Paula" },
+            { "characterName": "Rick" }
+          ]
+        }
+      ]
+    },
+    {
       "name": "Act I Scene 1",
+      "characterType": "inner",
       "choices": [
         {
           "variableId": "barbaraSpouse",
@@ -141,34 +176,35 @@
         {
           "areaName": "Area 1",
           "placements": [
-            { "frameCharacterName": "Faith" },
-            { "frameCharacterName": "Jessica" },
-            { "frameCharacterName": "Larry" },
-            { "frameCharacterName": "Milo" }
+            { "characterName": "Faith" },
+            { "characterName": "Jessica" },
+            { "characterName": "Larry" },
+            { "characterName": "Milo" }
           ]
         },
         {
           "areaName": "Area 2",
           "placements": [
-            { "frameCharacterName": "Devon" },
-            { "frameCharacterName": "Kathy" },
-            { "frameCharacterName": "Lily" },
-            { "frameCharacterName": "Patrick" }
+            { "characterName": "Devon" },
+            { "characterName": "Kathy" },
+            { "characterName": "Lily" },
+            { "characterName": "Patrick" }
           ]
         },
         {
           "areaName": "Area 3",
           "placements": [
-            { "frameCharacterName": "Lindsay" },
-            { "frameCharacterName": "Noah" },
-            { "frameCharacterName": "Paula" },
-            { "frameCharacterName": "Rick" }
+            { "characterName": "Lindsay" },
+            { "characterName": "Noah" },
+            { "characterName": "Paula" },
+            { "characterName": "Rick" }
           ]
         }
       ]
     },
     {
       "name": "Act I Scene 2",
+      "characterType": "inner",
       "choices": [
         {
           "variableId": "barbaraCheated",
@@ -192,34 +228,35 @@
         {
           "areaName": "Area 1",
           "placements": [
-            { "frameCharacterName": "Noah" },
-            { "frameCharacterName": "Jessica" },
-            { "frameCharacterName": "Kathy" },
-            { "frameCharacterName": "Milo" }
+            { "characterName": "Noah" },
+            { "characterName": "Jessica" },
+            { "characterName": "Kathy" },
+            { "characterName": "Milo" }
           ]
         },
         {
           "areaName": "Area 2",
           "placements": [
-            { "frameCharacterName": "Devon" },
-            { "frameCharacterName": "Larry" },
-            { "frameCharacterName": "Lily" },
-            { "frameCharacterName": "Lindsay" }
+            { "characterName": "Devon" },
+            { "characterName": "Larry" },
+            { "characterName": "Lily" },
+            { "characterName": "Lindsay" }
           ]
         },
         {
           "areaName": "Area 3",
           "placements": [
-            { "frameCharacterName": "Patrick" },
-            { "frameCharacterName": "Faith" },
-            { "frameCharacterName": "Paula" },
-            { "frameCharacterName": "Rick" }
+            { "characterName": "Patrick" },
+            { "characterName": "Faith" },
+            { "characterName": "Paula" },
+            { "characterName": "Rick" }
           ]
         }
       ]
     },
     {
       "name": "Act I Scene 3",
+      "characterType": "inner",
       "choices": [
         {
           "variableId": "divorce",
@@ -230,34 +267,35 @@
         {
           "areaName": "Area 1",
           "placements": [
-            { "frameCharacterName": "Noah" },
-            { "frameCharacterName": "Faith" },
-            { "frameCharacterName": "Lily" },
-            { "frameCharacterName": "Rick" }
+            { "characterName": "Noah" },
+            { "characterName": "Faith" },
+            { "characterName": "Lily" },
+            { "characterName": "Rick" }
           ]
         },
         {
           "areaName": "Area 2",
           "placements": [
-            { "frameCharacterName": "Milo" },
-            { "frameCharacterName": "Larry" },
-            { "frameCharacterName": "Kathy" },
-            { "frameCharacterName": "Paula" }
+            { "characterName": "Milo" },
+            { "characterName": "Larry" },
+            { "characterName": "Kathy" },
+            { "characterName": "Paula" }
           ]
         },
         {
           "areaName": "Area 3",
           "placements": [
-            { "frameCharacterName": "Devon" },
-            { "frameCharacterName": "Patrick" },
-            { "frameCharacterName": "Jessica" },
-            { "frameCharacterName": "Lindsay" }
+            { "characterName": "Devon" },
+            { "characterName": "Patrick" },
+            { "characterName": "Jessica" },
+            { "characterName": "Lindsay" }
           ]
         }
       ]
     },
     {
       "name": "Act I Scene 4",
+      "characterType": "inner",
       "choices": [
         {
           "variableId": "virginiaNursingHome",
@@ -268,34 +306,35 @@
         {
           "areaName": "Area 1",
           "placements": [
-            { "frameCharacterName": "Faith" },
-            { "frameCharacterName": "Jessica" },
-            { "frameCharacterName": "Patrick" },
-            { "frameCharacterName": "Rick" }
+            { "characterName": "Faith" },
+            { "characterName": "Jessica" },
+            { "characterName": "Patrick" },
+            { "characterName": "Rick" }
           ]
         },
         {
           "areaName": "Area 2",
           "placements": [
-            { "frameCharacterName": "Noah" },
-            { "frameCharacterName": "Lily" },
-            { "frameCharacterName": "Milo" },
-            { "frameCharacterName": "Kathy" }
+            { "characterName": "Noah" },
+            { "characterName": "Lily" },
+            { "characterName": "Milo" },
+            { "characterName": "Kathy" }
           ]
         },
         {
           "areaName": "Area 3",
           "placements": [
-            { "frameCharacterName": "Larry" },
-            { "frameCharacterName": "Devon" },
-            { "frameCharacterName": "Lindsay" },
-            { "frameCharacterName": "Paula" }
+            { "characterName": "Larry" },
+            { "characterName": "Devon" },
+            { "characterName": "Lindsay" },
+            { "characterName": "Paula" }
           ]
         }
       ]
     },
     {
       "name": "Act II Scene 1",
+      "characterType": "inner",
       "choices": [
         {
           "variableId": "brotherLentMoney",
@@ -306,30 +345,30 @@
         {
           "areaName": "Area 1",
           "placements": [
-            { "frameCharacterName": "Devon" },
-            { "frameCharacterName": "Kathy" },
-            { "frameCharacterName": "Patrick" },
-            { "frameCharacterName": "Lily", "innerCharacterName": "Stephanie" }
+            { "characterName": "Devon" },
+            { "characterName": "Kathy" },
+            { "characterName": "Patrick" },
+            { "characterName": "Lily", "secondaryCharacterName": "Stephanie" }
           ]
         },
         {
           "areaName": "Area 2",
           "placements": [
-            { "frameCharacterName": "Lindsay" },
-            { "frameCharacterName": "Noah" },
-            { "frameCharacterName": "Rick" },
-            { "frameCharacterName": "Paula", "innerCharacterName": "Stephanie" }
+            { "characterName": "Lindsay" },
+            { "characterName": "Noah" },
+            { "characterName": "Rick" },
+            { "characterName": "Paula", "secondaryCharacterName": "Stephanie" }
           ]
         },
         {
           "areaName": "Area 3",
           "placements": [
-            { "frameCharacterName": "Faith" },
-            { "frameCharacterName": "Larry" },
-            { "frameCharacterName": "Milo" },
+            { "characterName": "Faith" },
+            { "characterName": "Larry" },
+            { "characterName": "Milo" },
             {
-              "frameCharacterName": "Jessica",
-              "innerCharacterName": "Stephanie"
+              "characterName": "Jessica",
+              "secondaryCharacterName": "Stephanie"
             }
           ]
         }
@@ -337,6 +376,7 @@
     },
     {
       "name": "Act II Scene 2",
+      "characterType": "inner",
       "choices": [
         {
           "variableId": "drunkDrivingConsequences",
@@ -347,30 +387,30 @@
         {
           "areaName": "Area 1",
           "placements": [
-            { "frameCharacterName": "Devon" },
-            { "frameCharacterName": "Larry" },
-            { "frameCharacterName": "Lindsay" },
-            { "frameCharacterName": "Lily", "innerCharacterName": "Stephanie" }
+            { "characterName": "Devon" },
+            { "characterName": "Larry" },
+            { "characterName": "Lindsay" },
+            { "characterName": "Lily", "secondaryCharacterName": "Stephanie" }
           ]
         },
         {
           "areaName": "Area 2",
           "placements": [
-            { "frameCharacterName": "Patrick" },
-            { "frameCharacterName": "Rick" },
-            { "frameCharacterName": "Faith" },
-            { "frameCharacterName": "Paula", "innerCharacterName": "Stephanie" }
+            { "characterName": "Patrick" },
+            { "characterName": "Rick" },
+            { "characterName": "Faith" },
+            { "characterName": "Paula", "secondaryCharacterName": "Stephanie" }
           ]
         },
         {
           "areaName": "Area 3",
           "placements": [
-            { "frameCharacterName": "Noah" },
-            { "frameCharacterName": "Kathy" },
-            { "frameCharacterName": "Milo" },
+            { "characterName": "Noah" },
+            { "characterName": "Kathy" },
+            { "characterName": "Milo" },
             {
-              "frameCharacterName": "Jessica",
-              "innerCharacterName": "Stephanie"
+              "characterName": "Jessica",
+              "secondaryCharacterName": "Stephanie"
             }
           ]
         }
@@ -378,6 +418,7 @@
     },
     {
       "name": "Act II Scene 3",
+      "characterType": "inner",
       "choices": [
         {
           "variableId": "acceptZach",
@@ -388,69 +429,70 @@
         {
           "areaName": "Area 1",
           "placements": [
-            { "frameCharacterName": "Kathy" },
-            { "frameCharacterName": "Milo", "innerCharacterName": "Zach" },
-            { "frameCharacterName": "Larry" },
-            { "frameCharacterName": "Paula", "innerCharacterName": "Stephanie" }
+            { "characterName": "Kathy" },
+            { "characterName": "Milo", "secondaryCharacterName": "Zach" },
+            { "characterName": "Larry" },
+            { "characterName": "Paula", "secondaryCharacterName": "Stephanie" }
           ]
         },
         {
           "areaName": "Area 2",
           "placements": [
-            { "frameCharacterName": "Devon", "innerCharacterName": "Zach" },
+            { "characterName": "Devon", "secondaryCharacterName": "Zach" },
             {
-              "frameCharacterName": "Jessica",
-              "innerCharacterName": "Stephanie"
+              "characterName": "Jessica",
+              "secondaryCharacterName": "Stephanie"
             },
-            { "frameCharacterName": "Lindsay" },
-            { "frameCharacterName": "Patrick" }
+            { "characterName": "Lindsay" },
+            { "characterName": "Patrick" }
           ]
         },
         {
           "areaName": "Area 3",
           "placements": [
-            { "frameCharacterName": "Rick", "innerCharacterName": "Zach" },
-            { "frameCharacterName": "Faith" },
-            { "frameCharacterName": "Noah" },
-            { "frameCharacterName": "Lily", "innerCharacterName": "Stephanie" }
+            { "characterName": "Rick", "secondaryCharacterName": "Zach" },
+            { "characterName": "Faith" },
+            { "characterName": "Noah" },
+            { "characterName": "Lily", "secondaryCharacterName": "Stephanie" }
           ]
         }
       ]
     },
     {
       "name": "Act II Scene 4",
+      "characterType": "inner",
       "areaSetups": [
         {
           "areaName": "Area 1",
           "placements": [
-            { "frameCharacterName": "Kathy" },
-            { "frameCharacterName": "Milo", "innerCharacterName": "Zach" },
-            { "frameCharacterName": "Noah" },
-            { "frameCharacterName": "Lily", "innerCharacterName": "Stephanie" }
+            { "characterName": "Kathy" },
+            { "characterName": "Milo", "secondaryCharacterName": "Zach" },
+            { "characterName": "Noah" },
+            { "characterName": "Lily", "secondaryCharacterName": "Stephanie" }
           ]
         },
         {
           "areaName": "Area 2",
           "placements": [
-            { "frameCharacterName": "Devon", "innerCharacterName": "Zach" },
-            { "frameCharacterName": "Larry" },
+            { "characterName": "Devon", "secondaryCharacterName": "Zach" },
+            { "characterName": "Larry" },
             {
-              "frameCharacterName": "Paula",
-              "innerCharacterName": "Stephanie"
+              "characterName": "Paula",
+              "secondaryCharacterName": "Stephanie"
             },
-            { "frameCharacterName": "Lindsay" }
+            { "characterName": "Lindsay" }
           ]
         },
         {
           "areaName": "Area 3",
           "placements": [
-            { "frameCharacterName": "Rick", "innerCharacterName": "Zach" },
+            { "characterName": "Rick", "secondaryCharacterName": "Zach" },
             {
-              "frameCharacterName": "Jessica",
-              "innerCharacterName": "Stephanie"
+              "characterName": "Jessica",
+              "secondaryCharacterName": "Stephanie"
             },
-            { "frameCharacterName": "Faith" },
-            { "frameCharacterName": "Patrick" }
+            { "characterName": "Faith" },
+            { "characterName": "Patrick" }
           ]
         }
       ]

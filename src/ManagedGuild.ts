@@ -5,10 +5,9 @@ import { Game } from './game';
 export type ManagedGuild = {
   areaTextChannels: Map<string, GuildChannel>;
   areaVoiceChannels: Map<string, GuildChannel>;
-  frameCharacterRoles: Map<string, Role>;
+  characterRoles: Map<string, Role>;
   game: Game;
   guild: Guild;
-  innerCharacterRoles: Map<string, Role>;
   readyToPlay: boolean;
 };
 
@@ -40,15 +39,10 @@ function checkReadyToPlay(managedGuild: ManagedGuild) {
     game.areaNames,
     managedGuild.areaVoiceChannels ?? new Map<string, GuildChannel>(),
   );
-  const missingInnerCharacterRoles = findMissing(
-    game.innerCharacterNames,
-    managedGuild.innerCharacterRoles ?? new Map<string, Role>(),
+  const missingRoles = findMissing(
+    [...game.characters.keys()],
+    managedGuild.characterRoles ?? new Map<string, Role>(),
   );
-  const missingFrameCharacterRoles = findMissing(
-    game.frameCharacterNames,
-    managedGuild.frameCharacterRoles ?? new Map<string, Role>(),
-  );
-  const missingRoles = [...missingInnerCharacterRoles, ...missingFrameCharacterRoles];
 
   let errors: string[] = [];
   if (missingAreaTextChannels.length > 0) {
@@ -97,21 +91,17 @@ function loadAreaChannelsForGuild(managedGuild: ManagedGuild, game: Game) {
   managedGuild.areaVoiceChannels = areaVoiceChannels;
 }
 
-async function loadRolesForGuild(managedGuild: ManagedGuild) {
-  const frameCharacterRoles = new Map<string, Role>();
-  const innerCharacterRoles = new Map<string, Role>();
+export async function loadRolesForGuild(managedGuild: ManagedGuild) {
+  const characterRoles = new Map<string, Role>();
 
   const roles = await managedGuild.guild.roles.fetch();
   roles.cache.forEach((role) => {
-    if (managedGuild.game.frameCharacterNames.includes(role.name)) {
-      frameCharacterRoles.set(role.name, role);
-    } else if (managedGuild.game.innerCharacterNames.includes(role.name)) {
-      innerCharacterRoles.set(role.name, role);
+    if (managedGuild.game.characters.has(role.name)) {
+      characterRoles.set(role.name, role);
     }
   });
 
-  managedGuild.frameCharacterRoles = frameCharacterRoles;
-  managedGuild.innerCharacterRoles = innerCharacterRoles;
+  managedGuild.characterRoles = characterRoles;
 }
 
 function channelIsGuildChannel(channel: Channel): channel is GuildChannel {
@@ -173,8 +163,7 @@ export async function bringGuildUnderManagement(guild: Guild, game: Game) {
     game,
     areaTextChannels: new Map<string, GuildChannel>(),
     areaVoiceChannels: new Map<string, GuildChannel>(),
-    frameCharacterRoles: new Map<string, Role>(),
-    innerCharacterRoles: new Map<string, Role>(),
+    characterRoles: new Map<string, Role>(),
     readyToPlay: true,
   };
   managedGuildsByGuildId.set(guild.id, managedGuild);

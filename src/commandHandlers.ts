@@ -21,11 +21,14 @@ const list: CommandHandler = (managedGuild, msg) => {
 
 function formatPrepSceneResults(results: PrepSceneResults) {
   const warnings: string[] = flatMap(results.areaSetupResults, (areaSetupResults) =>
-    areaSetupResults.placementResults.map((placementResult) =>
+    flatMap(areaSetupResults.placementResults, (placementResult) => [
       placementResult.voiceChannelJoined
         ? undefined
         : `Member ${placementResult.member.user.tag} not joined to voice channel: ${placementResult.voiceChannelJoinError?.message}`,
-    ),
+      placementResult.nicknameChanged
+        ? undefined
+        : `Member ${placementResult.member.user.tag} nickname not changed: ${placementResult.nicknameChangeError?.message}`,
+    ]),
   ).filter(notEmpty);
 
   if (warnings.length === 0) {
@@ -42,7 +45,7 @@ const prep: CommandHandler = async (managedGuild, msg, args) => {
   } else {
     const scene = managedGuild.game.scenes.find((scene) => scene.name === args);
     if (scene) {
-      const results = await prepScene(managedGuild, managedGuild.game.scenes[0]);
+      const results = await prepScene(managedGuild, scene);
       msg.reply(`Prepped ${results.scene.name}${formatPrepSceneResults(results)}`);
     } else {
       msg.reply(
