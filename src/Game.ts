@@ -1,6 +1,7 @@
 import { flatMap } from 'lodash';
 import { Role } from 'discord.js';
 import {
+  ActionDefinition,
   BooleanExpression,
   GameStructure,
   loadGameStructure,
@@ -10,6 +11,9 @@ import {
 import { evaluateBooleanExpression, ResolutionContext, resolveVariable } from './gameLogic';
 import { ManagedGuild } from './managedGuild';
 import { notEmpty } from './utils';
+import assertNever from 'assert-never';
+import fs from 'fs';
+import path from 'path';
 
 type VariableBase = {
   id: string;
@@ -61,9 +65,27 @@ export type Choice = {
   if?: BooleanExpression;
 };
 
+type ActionBase = {
+  if?: BooleanExpression;
+  scope: 'area' | 'global';
+};
+
+export type SendMessageAction = ActionBase & {
+  action: 'sendMessage';
+  content: string;
+};
+
+export type SendFilesAction = ActionBase & {
+  action: 'sendFiles';
+  files: string[];
+};
+
+export type Action = SendMessageAction | SendFilesAction;
+
 export type Scene = {
   name: string;
   choices: Choice[];
+  actions: Action[];
   characterType: CharacterType;
   areaSetups: AreaSetup[];
 };
@@ -124,7 +146,26 @@ function parseVariableOrTemplateReferenceList(
   );
 }
 
-export function loadGame(structure: GameStructure): Game {
+function parseAction(definition: ActionDefinition, gamePath: string): Action {
+  if (definition.action === 'sendMessage') {
+    const content = fs.readFileSync(path.join(gamePath, definition.content.fromFile), {
+      encoding: 'utf-8',
+    });
+    return {
+      ...definition,
+      content,
+    };
+  } else if (definition.action === 'sendFiles') {
+    return {
+      ...definition,
+      files: definition.files.map((file) => path.join(gamePath, file)),
+    };
+  }
+
+  assertNever(definition);
+}
+
+export function loadGame(structure: GameStructure, gamePath: string): Game {
   const variableTemplates: VariableTemplateMap = new Map(
     (structure.variableTemplates ?? []).map((template) => [
       template.id,
@@ -200,6 +241,7 @@ export function loadGame(structure: GameStructure): Game {
     const scene: Scene = {
       name: sceneData.name,
       characterType,
+      actions: [],
       choices: [],
       areaSetups: [],
     };
@@ -255,6 +297,10 @@ export function loadGame(structure: GameStructure): Game {
       };
     });
 
+    scene.actions = (sceneData.actions ?? []).map((actionData) =>
+      parseAction(actionData, gamePath),
+    );
+
     scene.choices = (sceneData.choices ?? []).map((choiceData) => ({
       ...choiceData,
       scene,
@@ -275,7 +321,7 @@ export function loadGame(structure: GameStructure): Game {
 }
 
 export function parseGame(filename: string) {
-  return loadGame(loadGameStructure(filename));
+  return loadGame(loadGameStructure(filename), path.dirname(filename));
 }
 
 export function findAreaForPrimaryCharacterRole(role: Role, scene: Scene) {

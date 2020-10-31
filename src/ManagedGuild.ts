@@ -1,10 +1,10 @@
-import { Channel, Client, Guild, GuildChannel, Role } from 'discord.js';
+import { Channel, Client, Guild, GuildChannel, Role, TextChannel, VoiceChannel } from 'discord.js';
 import { handleCommand } from './commandHandlers';
 import { Game } from './game';
 
 export type ManagedGuild = {
-  areaTextChannels: Map<string, GuildChannel>;
-  areaVoiceChannels: Map<string, GuildChannel>;
+  areaTextChannels: Map<string, TextChannel>;
+  areaVoiceChannels: Map<string, VoiceChannel>;
   characterRoles: Map<string, Role>;
   game: Game;
   guild: Guild;
@@ -70,8 +70,8 @@ function checkReadyToPlay(managedGuild: ManagedGuild) {
 }
 
 function loadAreaChannelsForGuild(managedGuild: ManagedGuild, game: Game) {
-  const areaTextChannels = new Map<string, GuildChannel>();
-  const areaVoiceChannels = new Map<string, GuildChannel>();
+  const areaTextChannels = new Map<string, TextChannel>();
+  const areaVoiceChannels = new Map<string, VoiceChannel>();
 
   const areas = [...game.areas.values()];
   const areaNames = new Set(areas.map((area) => area.name));
@@ -82,9 +82,9 @@ function loadAreaChannelsForGuild(managedGuild: ManagedGuild, game: Game) {
   managedGuild.guild.channels.cache.forEach((channel) => {
     const channelName = channel.name;
     if (channel.type === 'voice' && areaNames.has(channelName)) {
-      areaVoiceChannels.set(channelName, channel);
+      areaVoiceChannels.set(channelName, channel as VoiceChannel);
     } else if (channel.type === 'text' && areaNameByTextChannelName.has(channelName)) {
-      areaTextChannels.set(areaNameByTextChannelName.get(channelName)!, channel);
+      areaTextChannels.set(areaNameByTextChannelName.get(channelName)!, channel as TextChannel);
     }
   });
   managedGuild.areaTextChannels = areaTextChannels;
@@ -161,8 +161,8 @@ export async function bringGuildUnderManagement(guild: Guild, game: Game) {
   const managedGuild: ManagedGuild = {
     guild,
     game,
-    areaTextChannels: new Map<string, GuildChannel>(),
-    areaVoiceChannels: new Map<string, GuildChannel>(),
+    areaTextChannels: new Map<string, TextChannel>(),
+    areaVoiceChannels: new Map<string, VoiceChannel>(),
     characterRoles: new Map<string, Role>(),
     readyToPlay: true,
   };

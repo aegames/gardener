@@ -4,11 +4,12 @@
     "db:migrate": "node-pg-migrate up --tsconfig tsconfig.json",
     "db:migrate:create": "node-pg-migrate create -j ts",
     "db:rollback": "node-pg-migrate down --tsconfig tsconfig.json",
-    "start": "nodemon --watch 'src/**' --ext 'ts' --exec 'ts-node src/index.ts'"
+    "start": "nodemon --watch src --watch garden --ext 'ts,json,md' --exec 'ts-node src/index.ts'"
   },
   "dependencies": {
     "@types/lodash": "^4.14.163",
     "@types/node": "^14.14.6",
+    "@types/ws": "^7.2.9",
     "assert-never": "^1.2.1",
     "discord.js": "^12.4.1",
     "dotenv": "^8.2.0",

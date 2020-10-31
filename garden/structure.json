@@ -172,6 +172,15 @@
           "scope": "area"
         }
       ],
+      "actions": [
+        {
+          "action": "sendMessage",
+          "content": {
+            "fromFile": "scene-intros/Scene 1, Version 1.md"
+          },
+          "scope": "area"
+        }
+      ],
       "areaSetups": [
         {
           "areaName": "Area 1",
@@ -205,6 +214,48 @@
     {
       "name": "Act I Scene 2",
       "characterType": "inner",
+      "actions": [
+        {
+          "action": "sendMessage",
+          "content": {
+            "fromFile": "scene-intros/Scene 2, Version 1 (A).md"
+          },
+          "scope": "area",
+          "if": {
+            "eq": [
+              "A",
+              {
+                "variableId": "barbaraSpouse",
+                "scope": "area"
+              }
+            ]
+          }
+        },
+        {
+          "action": "sendMessage",
+          "content": {
+            "fromFile": "scene-intros/Scene 2, Version 2 (B).md"
+          },
+          "scope": "area",
+          "if": {
+            "eq": [
+              "B",
+              {
+                "variableId": "barbaraSpouse",
+                "scope": "area"
+              }
+            ]
+          }
+        },
+        {
+          "action": "sendFiles",
+          "scope": "area",
+          "files": [
+            "scene-intros/Scene 2, Version 1 (A).md",
+            "scene-intros/Scene 2, Version 2 (B).md"
+          ]
+        }
+      ],
       "choices": [
         {
           "variableId": "barbaraCheated",

@@ -78,6 +78,34 @@ const ChoiceSchema = z.object({
   if: z.optional(BooleanExpressionSchema),
 });
 
+const MessageContentSchema = z.object({
+  fromFile: z.string(),
+});
+
+const ActionBaseSchema = z.object({
+  scope: VariableScopeSchema,
+  if: z.optional(BooleanExpressionSchema),
+});
+
+const SendMessageActionSchema = z.intersection(
+  ActionBaseSchema,
+  z.object({
+    action: z.literal('sendMessage'),
+    content: MessageContentSchema,
+  }),
+);
+
+const SendFilesActionSchema = z.intersection(
+  ActionBaseSchema,
+  z.object({
+    action: z.literal('sendFiles'),
+    files: z.array(z.string()),
+  }),
+);
+
+const ActionSchema = z.union([SendMessageActionSchema, SendFilesActionSchema]);
+export type ActionDefinition = z.infer<typeof ActionSchema>;
+
 const GameStructureSchema = z.object({
   variableTemplates: z.optional(
     z.array(
@@ -112,6 +140,7 @@ const GameStructureSchema = z.object({
       name: z.string(),
       characterType: z.string(),
       choices: z.optional(z.array(ChoiceSchema)),
+      actions: z.optional(z.array(ActionSchema)),
       areaSetups: z.array(
         z.object({
           areaName: z.string(),

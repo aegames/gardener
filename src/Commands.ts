@@ -1,7 +1,9 @@
-import { GuildChannel, GuildMember, OverwriteResolvable, Role } from 'discord.js';
+import assertNever from 'assert-never';
+import { GuildChannel, GuildMember, OverwriteResolvable, Role, TextChannel } from 'discord.js';
 import { flatMap, flatten } from 'lodash';
 import { getGameScene, setGameScene, setGameVariableValue } from './database';
 import {
+  Action,
   Area,
   AreaSetup,
   findAreaForPrimaryCharacterRole,
@@ -9,6 +11,7 @@ import {
   getSceneChoices,
   Scene,
 } from './game';
+import { evaluateBooleanExpression } from './gameLogic';
 import { loadRolesForGuild, ManagedGuild } from './managedGuild';
 import { notEmpty } from './utils';
 
@@ -164,13 +167,82 @@ export type PrepSceneResults = {
   }[];
 };
 
+async function sendLongMessage(channel: TextChannel, content: string) {
+  const paragraphs = content.split('\n\n').filter((paragraph) => paragraph.trim() !== '');
+  return await paragraphs.reduce(
+    (promise, paragraph) => promise.then(() => channel.send(paragraph)),
+    Promise.resolve(),
+  );
+}
+
+async function sendFiles(channel: TextChannel, files: string[]) {
+  return await channel.send({ files });
+}
+
+export async function executeAction(
+  managedGuild: ManagedGuild,
+  game: Game,
+  action: Action,
+  activeAreas: Area[],
+) {
+  if (action.scope === 'area') {
+    const areaApplicability = await Promise.all(
+      activeAreas.map(async (area) =>
+        action.if
+          ? ([
+              area,
+              await evaluateBooleanExpression(managedGuild, game, action.if, { area }),
+            ] as const)
+          : ([area, true] as const),
+      ),
+    );
+    const applicableAreas = areaApplicability
+      .filter(([, applicable]) => applicable)
+      .map(([area]) => area);
+
+    if (action.action === 'sendMessage') {
+      return await Promise.all(
+        applicableAreas.map((area) =>
+          sendLongMessage(managedGuild.areaTextChannels.get(area.name)!, action.content),
+        ),
+      );
+    } else if (action.action === 'sendFiles') {
+      return await Promise.all(
+        applicableAreas.map((area) =>
+          sendFiles(managedGuild.areaTextChannels.get(area.name)!, action.files),
+        ),
+      );
+    }
+
+    assertNever(action);
+  } else if (action.scope === 'global') {
+    const applicable = action.if
+      ? await evaluateBooleanExpression(managedGuild, game, action.if, {})
+      : true;
+    if (!applicable) {
+      return;
+    }
+
+    if (action.action === 'sendMessage') {
+      return await sendLongMessage(managedGuild.guild.systemChannel!, action.content);
+    } else if (action.action === 'sendFiles') {
+      return await sendFiles(managedGuild.guild.systemChannel!, action.files);
+    }
+
+    assertNever(action);
+  }
+
+  assertNever(action.scope);
+}
+
 export async function prepScene(
   managedGuild: ManagedGuild,
   scene: Scene,
 ): Promise<PrepSceneResults> {
   await setGameScene(managedGuild, scene);
   const areaSetups = scene.areaSetups ?? [];
-  const areaNames = new Set(areaSetups.map((areaSetup) => areaSetup.area.name));
+  const activeAreas = areaSetups.map((areaSetup) => areaSetup.area);
+  const areaNames = new Set(activeAreas.map((area) => area.name));
   const unusedAreas = [...managedGuild.game.areas.values()].filter(
     (area) => !areaNames.has(area.name),
   );
@@ -178,6 +250,16 @@ export async function prepScene(
     ...areaSetups.map((areaSetup) => setupArea(managedGuild, areaSetup)),
     ...unusedAreas.map((area) => lockArea(managedGuild, area)),
   ]);
+  await Promise.all(
+    activeAreas.map((area) =>
+      managedGuild.areaTextChannels.get(area.name)!.send(`__**${scene.name}**__`),
+    ),
+  );
+  await scene.actions.reduce(
+    (promise, action) =>
+      promise.then(() => executeAction(managedGuild, managedGuild.game, action, activeAreas)),
+    Promise.resolve(),
+  );
   return { scene, areaSetupResults };
 }
 
