@@ -7,7 +7,7 @@
     "noImplicitAny": true,
     "moduleResolution": "node",
     "sourceMap": true,
-    "lib": ["ES2020.Promise"],
+    "lib": ["ES2020.Promise", "ES2020"],
     "strictNullChecks": true,
     "outDir": "dist",
     "baseUrl": ".",

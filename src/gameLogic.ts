@@ -20,7 +20,8 @@ export function resolveVariable(
   if (ref.scope === 'global') {
     return game.globalVariables.get(ref.variableId);
   } else if (ref.scope === 'area') {
-    return context.area?.variables.get(ref.variableId);
+    console.log(context);
+    return context.area?.variables[ref.variableId];
   } else {
     assertNever(ref.scope);
   }
