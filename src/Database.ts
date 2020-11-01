@@ -1,16 +1,19 @@
 import { Pool } from 'pg';
-import { Game, GameVariable, Scene } from './game';
+import { Game, GameVariableBase, Scene } from './game';
 import { ManagedGuild } from './managedGuild';
 
 export const dbPool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
-function getQualifiedVariableId(variable: GameVariable) {
+function getQualifiedVariableId(variable: GameVariableBase) {
   return `${variable.scope}.${variable.id}`;
 }
 
-export async function getGameVariableValue(managedGuild: ManagedGuild, variable: GameVariable) {
+export async function getGameVariableValue<VariableType extends GameVariableBase>(
+  managedGuild: ManagedGuild,
+  variable: VariableType,
+) {
   const result = await dbPool.query(
     'SELECT value FROM game_variables WHERE guild_id = $1 AND variable_id = $2',
     [managedGuild.guild.id, getQualifiedVariableId(variable)],
@@ -25,7 +28,7 @@ export async function getGameVariableValue(managedGuild: ManagedGuild, variable:
 
 export function setGameVariableValue(
   managedGuild: ManagedGuild,
-  variable: GameVariable,
+  variable: GameVariableBase,
   value: any,
 ) {
   const jsonValue = JSON.stringify(value);
@@ -40,7 +43,10 @@ export function setGameVariableValue(
   );
 }
 
-export async function getGameScene(managedGuild: ManagedGuild, game: Game) {
+export async function getGameScene<VariableType extends GameVariableBase>(
+  managedGuild: ManagedGuild,
+  game: Game<VariableType>,
+) {
   const result = await dbPool.query('SELECT scene_name FROM game_states WHERE guild_id = $1', [
     managedGuild.guild.id,
   ]);
@@ -57,7 +63,7 @@ export async function getGameScene(managedGuild: ManagedGuild, game: Game) {
   return game.scenes.find((scene) => scene.name === sceneName);
 }
 
-export function setGameScene(managedGuild: ManagedGuild, scene?: Scene) {
+export function setGameScene(managedGuild: ManagedGuild, scene?: Scene<any>) {
   return dbPool.query(
     `INSERT INTO game_states (guild_id, scene_name)
     VALUES ($1, $2)

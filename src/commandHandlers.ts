@@ -1,6 +1,7 @@
 import { Message } from 'discord.js';
 import { flatMap } from 'lodash';
-import { makeChoice, prepNextScene, prepScene, PrepSceneResults } from './commands';
+import { prepNextScene, prepScene, PrepSceneResults } from './commands';
+import { Game, GameVariableBase } from './game';
 import { ManagedGuild } from './managedGuild';
 import { notEmpty } from './utils';
 
@@ -19,7 +20,9 @@ const list: CommandHandler = (managedGuild, msg) => {
   );
 };
 
-function formatPrepSceneResults(results: PrepSceneResults) {
+function formatPrepSceneResults<VariableType extends GameVariableBase>(
+  results: PrepSceneResults<VariableType>,
+) {
   const warnings: string[] = flatMap(results.areaSetupResults, (areaSetupResults) =>
     flatMap(areaSetupResults.placementResults, (placementResult) => [
       placementResult.voiceChannelJoined
@@ -57,29 +60,19 @@ const prep: CommandHandler = async (managedGuild, msg, args) => {
   }
 };
 
-const choose: CommandHandler = async (managedGuild, msg, args) => {
-  const { member } = msg;
-  if (member == null) {
-    return;
-  }
-
-  const choice = await makeChoice(managedGuild, member, args);
-  msg.reply(`Thank you.  Choice recorded: ${choice.label}`);
-};
-
-const commandHandlers: Record<string, CommandHandler> = {
+const builtInCommandHandlers: Record<string, CommandHandler> = {
   list,
   prep,
-  choose,
 };
 
 export async function handleCommand(
   managedGuild: ManagedGuild,
+  game: Game<any>,
   msg: Message,
   command: string,
   args: string,
 ) {
-  const dispatcher = commandHandlers[command];
+  const dispatcher = game.commandHandlers[command] ?? builtInCommandHandlers[command];
   if (dispatcher != null) {
     try {
       await dispatcher(managedGuild, msg, args);

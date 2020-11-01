@@ -1,38 +1,17 @@
-import { flatMap } from 'lodash';
 import { Role } from 'discord.js';
-import {
-  ActionDefinition,
-  BooleanExpression,
-  GameStructure,
-  loadGameStructure,
-  VariableDefinition,
-  VariableDefinitionOrTemplateReference,
-} from './GameStructure';
-import { evaluateBooleanExpression, ResolutionContext, resolveVariable } from './gameLogic';
+import { Dictionary } from 'lodash';
+import { CommandHandler } from './commandHandlers';
 import { ManagedGuild } from './managedGuild';
-import { notEmpty } from './utils';
-import assertNever from 'assert-never';
-import fs from 'fs';
-import path from 'path';
 
-type VariableBase = {
+export type GameVariableBase = {
   id: string;
+  type: string; // each variable type should specify a literal for this
   scope: string;
 };
 
-export type ChoiceVariable = VariableBase & {
-  type: 'choice';
-  choices: {
-    value: string;
-    label: string;
-  }[];
-};
-
-export type GameVariable = ChoiceVariable; // reserved for future extensibility
-
-export type Area = {
+export type Area<VariableType extends GameVariableBase> = {
   name: string;
-  variables: Map<string, GameVariable>;
+  variables: Partial<Record<VariableType['id'], VariableType>>;
 };
 
 export type CharacterType = {
@@ -52,314 +31,39 @@ export type Placement = {
   secondaryCharacter?: Character;
 };
 
-export type AreaSetup = {
-  area: Area;
-  scene: Scene;
+export type AreaSetup<VariableType extends GameVariableBase> = {
+  area: Area<VariableType>;
+  scene: Scene<VariableType>;
   placements: Placement[];
 };
 
-export type Choice = {
-  variableId: string;
-  scene: Scene;
-  scope: 'area' | 'global';
-  if?: BooleanExpression;
-};
-
-type ActionBase = {
-  if?: BooleanExpression;
-  scope: 'area' | 'global';
-};
-
-export type SendMessageAction = ActionBase & {
-  action: 'sendMessage';
-  content: string;
-};
-
-export type SendFilesAction = ActionBase & {
-  action: 'sendFiles';
-  files: string[];
-};
-
-export type Action = SendMessageAction | SendFilesAction;
-
-export type Scene = {
+export type Scene<VariableType extends GameVariableBase> = {
   name: string;
-  choices: Choice[];
-  actions: Action[];
   characterType: CharacterType;
-  areaSetups: AreaSetup[];
+  areaSetups: AreaSetup<VariableType>[];
 };
 
-export type Game = {
-  areas: Map<string, Area>;
+export type Game<VariableType extends GameVariableBase> = {
+  areas: Map<string, Area<VariableType>>;
   areaNames: string[];
   characters: Map<string, Character>;
   characterTypes: Map<string, CharacterType>;
-  globalVariables: Map<string, GameVariable>;
-  scenes: Scene[];
+  commandHandlers: Dictionary<CommandHandler>;
+  globalVariables: Map<string, GameVariableBase>;
+  postPrepScene?: (
+    managedGuild: ManagedGuild,
+    scene: Scene<VariableType>,
+    area: Area<VariableType>,
+  ) => Promise<void>;
+  scenes: Scene<VariableType>[];
   sceneNames: string[];
 };
 
-type VariableTemplateMap = Map<string, GameVariable[]>;
-
-function parseVariable(definition: VariableDefinition, scope: string): GameVariable {
-  if (definition.type === 'choice') {
-    return {
-      id: definition.id,
-      scope,
-      type: 'choice',
-      choices: [...definition.choices],
-    };
-  } else {
-    throw new Error(`Unknown variable type: "${definition.type}"`);
-  }
-}
-
-function parseVariableOrTemplateReference(
-  definition: VariableDefinitionOrTemplateReference,
-  variableTemplates: VariableTemplateMap,
-  scope: string,
-): GameVariable[] {
-  if ('templateId' in definition) {
-    const variables = variableTemplates.get(definition.templateId);
-    if (variables == null) {
-      throw new Error(`No variable template with id "${definition.templateId}"`);
-    }
-    return variables.map((definition) => ({
-      ...definition,
-      scope,
-    }));
-  } else {
-    return [parseVariable(definition, scope)];
-  }
-}
-
-function parseVariableOrTemplateReferenceList(
-  definitions: VariableDefinitionOrTemplateReference[],
-  variableTemplates: VariableTemplateMap,
-  scope: string,
-): Map<string, GameVariable> {
-  return new Map<string, GameVariable>(
-    flatMap(definitions, (varDef) =>
-      parseVariableOrTemplateReference(varDef, variableTemplates, scope),
-    ).map((variable) => [variable.id, variable]),
-  );
-}
-
-function parseAction(definition: ActionDefinition, gamePath: string): Action {
-  if (definition.action === 'sendMessage') {
-    const content = fs.readFileSync(path.join(gamePath, definition.content.fromFile), {
-      encoding: 'utf-8',
-    });
-    return {
-      ...definition,
-      content,
-    };
-  } else if (definition.action === 'sendFiles') {
-    return {
-      ...definition,
-      files: definition.files.map((file) => path.join(gamePath, file)),
-    };
-  }
-
-  assertNever(definition);
-}
-
-export function loadGame(structure: GameStructure, gamePath: string): Game {
-  const variableTemplates: VariableTemplateMap = new Map(
-    (structure.variableTemplates ?? []).map((template) => [
-      template.id,
-      template.variables.map((definition) => parseVariable(definition, `template.${template.id}`)),
-    ]),
-  );
-  const globalVariables = parseVariableOrTemplateReferenceList(
-    structure.globalVariables ?? [],
-    variableTemplates,
-    'global',
-  );
-
-  const areas = new Map<string, Area>(
-    structure.areas.map((area) => [
-      area.name,
-      {
-        name: area.name,
-        variables: parseVariableOrTemplateReferenceList(
-          area.variables ?? [],
-          variableTemplates,
-          `area.${area.name.toLowerCase().replace(/\W/g, '_')}`,
-        ),
-      },
-    ]),
-  );
-  const characterTypes = new Map<string, CharacterType>(
-    structure.characterTypes.map((characterType) => [
-      characterType.name,
-      { ...characterType, primary: characterType.primary ?? false },
-    ]),
-  );
-  const characters = new Map<string, Character>(
-    structure.characters.map((characterData) => {
-      const characterType = characterTypes.get(characterData.type);
-      if (!characterType) {
-        throw new Error(
-          `Character ${characterData.name} references non-existent character type "${characterData.type}"`,
-        );
-      }
-      const character: Character = {
-        name: characterData.name,
-        type: characterType,
-        defaultPrimaryCharacters: [],
-      };
-      return [character.name, character];
-    }),
-  );
-  structure.characters.forEach((characterData) => {
-    (characterData.defaultPrimaryCharacterNames ?? []).forEach((pcName) => {
-      const primaryCharacter = characters.get(pcName);
-      const secondaryCharacter = characters.get(characterData.name)!;
-      if (!primaryCharacter) {
-        throw new Error(
-          `Secondary character ${secondaryCharacter.name} references non-existent primary character "${pcName}"`,
-        );
-      }
-      if (primaryCharacter.defaultSecondaryCharacter) {
-        throw new Error(
-          `Secondary character ${secondaryCharacter.name} specifies ${primaryCharacter.name} as default primary character, but they already have ${primaryCharacter.defaultSecondaryCharacter.name} as a default secondary character`,
-        );
-      }
-      secondaryCharacter.defaultPrimaryCharacters.push(primaryCharacter);
-      primaryCharacter.defaultSecondaryCharacter = secondaryCharacter;
-    });
-  });
-  const scenes: Scene[] = structure.scenes.map((sceneData) => {
-    const characterType = characterTypes.get(sceneData.characterType);
-    if (!characterType) {
-      throw new Error(
-        `Scene ${sceneData.name} references non-existent character type "${characterType}"`,
-      );
-    }
-    const scene: Scene = {
-      name: sceneData.name,
-      characterType,
-      actions: [],
-      choices: [],
-      areaSetups: [],
-    };
-
-    scene.areaSetups = sceneData.areaSetups.map((areaSetup) => {
-      const errorHeader = `Scene ${sceneData.name} area setup for ${areaSetup.areaName}`;
-      const area = areas.get(areaSetup.areaName);
-      if (!area) {
-        throw new Error(`${errorHeader} references non-existent area: "${areaSetup.areaName}"`);
-      }
-
-      return {
-        area,
-        scene,
-        placements: areaSetup.placements.map((placement) => {
-          const primaryCharacter = characters.get(placement.characterName);
-          if (!primaryCharacter) {
-            throw new Error(
-              `${errorHeader} references non-existent character "${placement.characterName}"`,
-            );
-          }
-
-          if (scene.characterType.primary) {
-            if (!primaryCharacter.type.primary) {
-              throw new Error(
-                `${errorHeader} references secondary character ${primaryCharacter.name}, but ${scene.name} is a primary-character scene`,
-              );
-            }
-
-            return { primaryCharacter };
-          } else {
-            const scName =
-              placement.secondaryCharacterName ?? primaryCharacter.defaultSecondaryCharacter?.name;
-            if (!scName) {
-              throw new Error(
-                `${errorHeader} places ${primaryCharacter.name} without specifying a secondaryCharacterName, but ${primaryCharacter.name} has no default secondary character`,
-              );
-            }
-            const secondaryCharacter = characters.get(scName);
-            if (!secondaryCharacter) {
-              throw new Error(
-                `${errorHeader} references non-existent secondary character "${scName}"`,
-              );
-            }
-            if (secondaryCharacter.type.primary) {
-              throw new Error(
-                `${errorHeader} specifies ${secondaryCharacter.name} as a secondary character, but they are a primary character`,
-              );
-            }
-            return { primaryCharacter, secondaryCharacter };
-          }
-        }),
-      };
-    });
-
-    scene.actions = (sceneData.actions ?? []).map((actionData) =>
-      parseAction(actionData, gamePath),
-    );
-
-    scene.choices = (sceneData.choices ?? []).map((choiceData) => ({
-      ...choiceData,
-      scene,
-    }));
-
-    return scene;
-  });
-
-  return {
-    areas,
-    areaNames: [...areas.keys()],
-    characterTypes,
-    characters,
-    globalVariables,
-    scenes,
-    sceneNames: scenes.map((scene) => scene.name),
-  };
-}
-
-export function parseGame(filename: string) {
-  return loadGame(loadGameStructure(filename), path.dirname(filename));
-}
-
-export function findAreaForPrimaryCharacterRole(role: Role, scene: Scene) {
+export function findAreaForPrimaryCharacterRole<VariableType extends GameVariableBase>(
+  role: Role,
+  scene: Scene<VariableType>,
+) {
   return scene.areaSetups.find((areaSetup) =>
     areaSetup.placements.some((placement) => role.name === placement.primaryCharacter.name),
   )?.area;
-}
-
-async function resolveSceneChoice(
-  managedGuild: ManagedGuild,
-  game: Game,
-  context: ResolutionContext,
-  choice: Choice,
-) {
-  if (choice.if != null) {
-    const passed = await evaluateBooleanExpression(managedGuild, game, choice.if, context);
-    if (!passed) {
-      return undefined;
-    }
-  }
-
-  const variable = resolveVariable(game, choice, context);
-  if (variable == null) {
-    return undefined;
-  }
-
-  return variable;
-}
-
-export async function getSceneChoices(
-  managedGuild: ManagedGuild,
-  game: Game,
-  scene: Scene,
-  context: ResolutionContext,
-): Promise<ChoiceVariable[]> {
-  const resolvedVariables = await Promise.all(
-    scene.choices.map((choice) => resolveSceneChoice(managedGuild, game, context, choice)),
-  );
-
-  return resolvedVariables.filter(notEmpty);
 }

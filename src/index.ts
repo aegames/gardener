@@ -2,19 +2,17 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import DiscordJS from 'discord.js';
-import { parseGame } from './game';
 import { bringGuildUnderManagement, setupClient } from './managedGuild';
+import { gardenGame } from '../garden/gardenGame';
 
 const client = new DiscordJS.Client();
-
-const game = parseGame('./garden/structure.json');
 
 setupClient(client);
 
 client.on('ready', async () => {
   console.log(`Logged in as ${client.user?.tag}!`);
   client.guilds.cache.forEach(async (guild) => {
-    bringGuildUnderManagement(guild, game);
+    bringGuildUnderManagement(guild, gardenGame);
   });
 });
 

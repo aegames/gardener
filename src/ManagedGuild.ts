@@ -6,7 +6,7 @@ export type ManagedGuild = {
   areaTextChannels: Map<string, TextChannel>;
   areaVoiceChannels: Map<string, VoiceChannel>;
   characterRoles: Map<string, Role>;
-  game: Game;
+  game: Game<any>;
   guild: Guild;
   readyToPlay: boolean;
 };
@@ -69,7 +69,7 @@ function checkReadyToPlay(managedGuild: ManagedGuild) {
   }
 }
 
-function loadAreaChannelsForGuild(managedGuild: ManagedGuild, game: Game) {
+function loadAreaChannelsForGuild(managedGuild: ManagedGuild, game: Game<any>) {
   const areaTextChannels = new Map<string, TextChannel>();
   const areaVoiceChannels = new Map<string, VoiceChannel>();
 
@@ -153,11 +153,11 @@ export function setupClient(client: Client) {
     const args = match[2]?.trim() ?? '';
 
     console.log(`>> ${msg.member?.user.tag}: ${msg.content}`);
-    await handleCommand(managedGuild, msg, command, args);
+    await handleCommand(managedGuild, managedGuild.game, msg, command, args);
   });
 }
 
-export async function bringGuildUnderManagement(guild: Guild, game: Game) {
+export async function bringGuildUnderManagement(guild: Guild, game: Game<any>) {
   const managedGuild: ManagedGuild = {
     guild,
     game,
