@@ -1,14 +1,6 @@
 import { cloneDeep, keyBy } from 'lodash';
 import { GameVariableBase } from '../engine/game';
 
-export type ChoiceVariable = GameVariableBase & {
-  type: 'choice';
-  choices: {
-    value: string;
-    label: string;
-  }[];
-};
-
 export type GardenVariableId =
   | 'barbaraSpouse'
   | 'barbaraCheated'
@@ -18,6 +10,15 @@ export type GardenVariableId =
   | 'brotherLentMoney'
   | 'drunkDrivingConsequences'
   | 'acceptZach';
+
+export type ChoiceVariable = GameVariableBase & {
+  type: 'choice';
+  id: GardenVariableId;
+  choices: {
+    value: string;
+    label: string;
+  }[];
+};
 
 export type GardenVariable = ChoiceVariable & {
   id: GardenVariableId;

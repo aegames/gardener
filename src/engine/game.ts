@@ -45,11 +45,15 @@ export type Scene<VariableType extends GameVariableBase> = {
 
 export type Game<VariableType extends GameVariableBase> = {
   areas: Map<string, Area<VariableType>>;
-  areaNames: string[];
   characters: Map<string, Character>;
   characterTypes: Map<string, CharacterType>;
   commandHandlers: Dictionary<CommandHandler>;
-  globalVariables: Map<string, GameVariableBase>;
+  globalVariables: Map<string, VariableType>;
+  prePrepScene?: (
+    managedGuild: ManagedGuild,
+    scene: Scene<VariableType>,
+    area: Area<VariableType>,
+  ) => Promise<void>;
   postPrepScene?: (
     managedGuild: ManagedGuild,
     scene: Scene<VariableType>,
@@ -59,11 +63,11 @@ export type Game<VariableType extends GameVariableBase> = {
   sceneNames: string[];
 };
 
-export function findAreaForPrimaryCharacterRole<VariableType extends GameVariableBase>(
-  role: Role,
+export function findAreaForPrimaryCharacter<VariableType extends GameVariableBase>(
+  character: Character,
   scene: Scene<VariableType>,
 ) {
   return scene.areaSetups.find((areaSetup) =>
-    areaSetup.placements.some((placement) => role.name === placement.primaryCharacter.name),
+    areaSetup.placements.some((placement) => character.name === placement.primaryCharacter.name),
   )?.area;
 }

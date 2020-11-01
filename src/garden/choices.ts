@@ -1,12 +1,12 @@
 import { GuildMember } from 'discord.js';
-import { findAreaForPrimaryCharacterRole } from '../engine/game';
-import { getPrimaryCharacterRole } from '../engine/commands';
-import { getGameScene, setGameVariableValue } from '../engine/database';
+import { Character, findAreaForPrimaryCharacter } from '../engine/game';
+import { getMemberCharacters } from '../engine/commands';
+import { getGameScene } from '../engine/database';
 import { ManagedGuild } from '../engine/managedGuild';
 import { flatMap } from 'lodash';
 import { GardenScene } from './scenes';
 import { GardenArea } from './areas';
-import { gardenGame, getGardenVar } from './gardenGame';
+import { gardenGame, getGardenVar, setGardenVar } from './gardenGame';
 import { ChoiceVariable } from './variables';
 import { notEmpty } from '../utils';
 
@@ -18,7 +18,7 @@ async function getSceneChoices(
   if (scene.name === 'Act I Scene 1') {
     return [area.variables.barbaraSpouse].filter(notEmpty);
   } else if (scene.name === 'Act I Scene 2') {
-    const barbaraSpouse = await getGardenVar(managedGuild, 'barbaraSpouse', area);
+    const barbaraSpouse = await getGardenVar(managedGuild, area, 'barbaraSpouse');
     if (barbaraSpouse === 'A') {
       return [area.variables.barbaraCheated, area.variables.spouseCheated].filter(notEmpty);
     } else {
@@ -39,24 +39,31 @@ async function getSceneChoices(
   return [];
 }
 
-export async function getAvailableChoicesForMember(
-  managedGuild: ManagedGuild,
-  member: GuildMember,
-) {
-  const currentScene = (await getGameScene(managedGuild, gardenGame)) as GardenScene;
-  if (currentScene == null) {
+export async function getStateForMember(managedGuild: ManagedGuild, member: GuildMember) {
+  const scene = (await getGameScene(managedGuild, gardenGame)) as GardenScene;
+  if (scene == null) {
     throw new Error("Choices can only be made in a scene, and the game currently isn't in one");
   }
 
-  const primaryRole = getPrimaryCharacterRole(member, gardenGame);
-  if (!primaryRole) {
+  const characters = getMemberCharacters(member, gardenGame);
+  const primaryCharacter = characters.find((character) => character.type.primary);
+  if (!primaryCharacter) {
     throw new Error(
-      "You don't have a primary character role assigned, so you can't make choices.  This is probably a mistake, please ask the GM about this.",
+      "You don't have a primary character assigned, so you can't make choices.  This is probably a mistake, please ask the GM about this.",
     );
   }
 
-  const area = findAreaForPrimaryCharacterRole(primaryRole, currentScene) as GardenArea;
-  const availableChoiceVariables = await getSceneChoices(managedGuild, currentScene, area);
+  const area = findAreaForPrimaryCharacter(primaryCharacter, scene) as GardenArea;
+  return { scene, primaryCharacter, characters, area };
+}
+
+export async function getAvailableChoicesForMember(
+  managedGuild: ManagedGuild,
+  scene: GardenScene,
+  area: GardenArea,
+  characters: Character[],
+) {
+  const availableChoiceVariables = await getSceneChoices(managedGuild, scene, area);
 
   return flatMap(availableChoiceVariables, (variable) =>
     variable.choices.map((choice) => ({
@@ -68,7 +75,13 @@ export async function getAvailableChoicesForMember(
 }
 
 export async function makeChoice(managedGuild: ManagedGuild, member: GuildMember, args: string) {
-  const availableChoices = await getAvailableChoicesForMember(managedGuild, member);
+  const { scene, characters, area } = await getStateForMember(managedGuild, member);
+  const availableChoices = await getAvailableChoicesForMember(
+    managedGuild,
+    scene,
+    area,
+    characters,
+  );
   if (availableChoices.length === 0) {
     throw new Error("You don't have any choices available right now.");
   }
@@ -87,6 +100,6 @@ export async function makeChoice(managedGuild: ManagedGuild, member: GuildMember
     throw new Error(`${choiceArg} is not a valid choice right now.  ${choiceHelp}`);
   }
 
-  await setGameVariableValue(managedGuild, choice.variable, choice.value);
+  await setGardenVar(managedGuild, area, choice.variable.id, choice.value);
   return choice;
 }

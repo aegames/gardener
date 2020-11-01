@@ -1,46 +1,88 @@
-import { Pool } from 'pg';
+import { Pool, QueryConfig, QueryResult, QueryResultRow } from 'pg';
 import { Game, GameVariableBase, Scene } from './game';
+import { ResolvedVariable } from './gameLogic';
+import logger from './logger';
 import { ManagedGuild } from './managedGuild';
 
 export const dbPool = new Pool({
   connectionString: process.env.DATABASE_URL,
+  log: (...messages: any[]) => {
+    messages.forEach((message) => logger.debug(`Connection pool: ${message}`));
+  },
 });
 
-function getQualifiedVariableId(variable: GameVariableBase) {
-  return `${variable.scope}.${variable.id}`;
+function query<R extends QueryResultRow = any, I extends any[] = any[]>(
+  queryTextOrConfig: string | QueryConfig<I>,
+  values?: I,
+): Promise<QueryResult<R>> {
+  logger.verbose(`SQL: ${queryTextOrConfig}\n${JSON.stringify(values)}`);
+  return dbPool.query(queryTextOrConfig, values);
+}
+
+export function getQualifiedVariableId<VariableType extends GameVariableBase>(
+  variable: ResolvedVariable<VariableType>,
+) {
+  return `${variable.qualifier}.${variable.variable.id}`;
+}
+
+export async function getQualifiedVariableValues(
+  managedGuild: ManagedGuild,
+  ...qualifiedIds: string[]
+) {
+  const result = await query(
+    'SELECT variable_id, value FROM game_variables WHERE guild_id = $1 AND variable_id = ANY($2::text[])',
+    [managedGuild.guild.id, qualifiedIds],
+  );
+
+  return qualifiedIds.map((qualifiedId) => {
+    const row = result.rows.find((row) => row.variable_id === qualifiedId);
+    return row?.value;
+  });
+}
+
+export async function getQualifiedVariableValue(managedGuild: ManagedGuild, qualifiedId: string) {
+  const values = await getQualifiedVariableValues(managedGuild, qualifiedId);
+  return values[0];
+}
+
+export async function getGameVariableValues<VariableType extends GameVariableBase>(
+  managedGuild: ManagedGuild,
+  ...variables: ResolvedVariable<VariableType>[]
+) {
+  return await getQualifiedVariableValues(managedGuild, ...variables.map(getQualifiedVariableId));
 }
 
 export async function getGameVariableValue<VariableType extends GameVariableBase>(
   managedGuild: ManagedGuild,
-  variable: VariableType,
+  variable: ResolvedVariable<VariableType>,
 ) {
-  const result = await dbPool.query(
-    'SELECT value FROM game_variables WHERE guild_id = $1 AND variable_id = $2',
-    [managedGuild.guild.id, getQualifiedVariableId(variable)],
-  );
-
-  if (result.rowCount === 0) {
-    return undefined;
-  }
-
-  return result.rows[0].value;
+  const values = await getGameVariableValues(managedGuild, variable);
+  return values[0];
 }
 
-export function setGameVariableValue(
+export function setQualifiedVariableValue(
   managedGuild: ManagedGuild,
-  variable: GameVariableBase,
+  qualifiedId: string,
   value: any,
 ) {
   const jsonValue = JSON.stringify(value);
 
-  return dbPool.query(
+  return query(
     `INSERT INTO game_variables (guild_id, variable_id, value)
     VALUES ($1, $2, $3)
     ON CONFLICT (guild_id, variable_id)
     DO
       UPDATE SET value = $4`,
-    [managedGuild.guild.id, getQualifiedVariableId(variable), jsonValue, jsonValue],
+    [managedGuild.guild.id, qualifiedId, jsonValue, jsonValue],
   );
+}
+
+export function setGameVariableValue<VariableType extends GameVariableBase>(
+  managedGuild: ManagedGuild,
+  variable: ResolvedVariable<VariableType>,
+  value: any,
+) {
+  return setQualifiedVariableValue(managedGuild, getQualifiedVariableId(variable), value);
 }
 
 export async function getGameScene<VariableType extends GameVariableBase>(
@@ -64,7 +106,7 @@ export async function getGameScene<VariableType extends GameVariableBase>(
 }
 
 export function setGameScene(managedGuild: ManagedGuild, scene?: Scene<any>) {
-  return dbPool.query(
+  return query(
     `INSERT INTO game_states (guild_id, scene_name)
     VALUES ($1, $2)
     ON CONFLICT (guild_id)
@@ -72,4 +114,9 @@ export function setGameScene(managedGuild: ManagedGuild, scene?: Scene<any>) {
       UPDATE SET scene_name = $3`,
     [managedGuild.guild.id, scene?.name, scene?.name],
   );
+}
+
+export async function deleteGameData(managedGuild: ManagedGuild) {
+  await query(`DELETE FROM game_states WHERE guild_id = $1`, [managedGuild.guild.id]);
+  await query(`DELETE FROM game_variables WHERE guild_id = $1`, [managedGuild.guild.id]);
 }

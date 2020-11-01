@@ -21,7 +21,7 @@ async function placeCharacter<VariableType extends GameVariableBase>(
   game: Game<VariableType>,
 ): Promise<PlacementResult[]> {
   if (primaryRole.members.size === 0) {
-    logger.debug(`No player for ${primaryRole.name}`);
+    logger.verbose(`No player for ${primaryRole.name}`);
   }
 
   const promises = primaryRole.members.array().map(async (member) => {
@@ -37,7 +37,7 @@ async function placeCharacter<VariableType extends GameVariableBase>(
       return !secondaryRole || role.name !== secondaryRole.name;
     });
 
-    logger.debug(
+    logger.verbose(
       `Giving ${member.user.tag} ${rolesToAdd.map((role) => role.name).join(', ')}, moving to ${
         voiceChannel.name
       }${
@@ -174,29 +174,41 @@ export async function prepScene<VariableType extends GameVariableBase>(
   managedGuild: ManagedGuild,
   scene: Scene<VariableType>,
 ): Promise<PrepSceneResults<VariableType>> {
-  await setGameScene(managedGuild, scene);
   const areaSetups = scene.areaSetups ?? [];
   const activeAreas = areaSetups.map((areaSetup) => areaSetup.area);
   const areaNames = new Set(activeAreas.map((area) => area.name));
   const unusedAreas = [...managedGuild.game.areas.values()].filter(
     (area) => !areaNames.has(area.name),
   );
+  const { prePrepScene, postPrepScene } = managedGuild.game;
+  if (prePrepScene) {
+    const prePrepResults = await Promise.allSettled(
+      activeAreas.map((area) => prePrepScene(managedGuild, scene, area)),
+    );
+    const prePrepErrors = prePrepResults
+      .map((result) => (result.status === 'rejected' ? result.reason.message : undefined))
+      .filter(notEmpty);
+    if (prePrepErrors.length > 0) {
+      throw new Error(`Can't prep ${scene.name}:\n${prePrepErrors.join('\n')}`);
+    }
+  }
+
+  await setGameScene(managedGuild, scene);
   const areaSetupResults = await Promise.all<any>([
     ...areaSetups.map((areaSetup) => setupArea(managedGuild, areaSetup)),
     ...unusedAreas.map((area) => lockArea(managedGuild, area)),
   ]);
+
   await Promise.all(
     activeAreas.map((area) =>
-      managedGuild.areaTextChannels
-        .get(area.name)!
-        .send(`__**${scene.name}**__`)
-        .then(() => {
-          if (managedGuild.game.postPrepScene) {
-            return managedGuild.game.postPrepScene(managedGuild, scene, area);
-          }
-        }),
+      managedGuild.areaTextChannels.get(area.name)!.send(`__**${scene.name}**__`),
     ),
   );
+
+  if (postPrepScene) {
+    await Promise.all(activeAreas.map((area) => postPrepScene(managedGuild, scene, area)));
+  }
+
   return { scene, areaSetupResults };
 }
 
@@ -217,6 +229,13 @@ export async function prepNextScene(managedGuild: ManagedGuild) {
   return await prepScene(managedGuild, nextScene);
 }
 
-export function getPrimaryCharacterRole(member: GuildMember, game: Game<any>) {
-  return member.roles.cache.array().find((role) => game.characters.get(role.name)?.type.primary);
+export function getMemberCharacters(member: GuildMember, game: Game<any>) {
+  return member.roles.cache
+    .array()
+    .map((role) => game.characters.get(role.name))
+    .filter(notEmpty);
+}
+
+export function getPrimaryCharacter(member: GuildMember, game: Game<any>) {
+  return getMemberCharacters(member, game).find((character) => character.type.primary);
 }

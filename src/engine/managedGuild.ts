@@ -32,12 +32,13 @@ export function getAreaVoiceChannel(managedGuild: ManagedGuild, areaName: string
 
 function checkReadyToPlay(managedGuild: ManagedGuild) {
   const { guild, game } = managedGuild;
+  const areaNames = [...game.areas.values()].map((area) => area.name);
   const missingAreaTextChannels = findMissing(
-    game.areaNames,
+    areaNames,
     managedGuild.areaTextChannels ?? new Map<string, GuildChannel>(),
   );
   const missingAreaVoiceChannels = findMissing(
-    game.areaNames,
+    areaNames,
     managedGuild.areaVoiceChannels ?? new Map<string, GuildChannel>(),
   );
   const missingRoles = findMissing(

@@ -5,8 +5,9 @@ import path from 'path';
 import fs from 'fs';
 import { TextChannel } from 'discord.js';
 import { ManagedGuild } from '../engine/managedGuild';
-import { getGardenVar } from './gardenGame';
+import { getGardenVars } from './gardenGame';
 import { GardenVariableId } from './variables';
+import logger from '../engine/logger';
 
 async function sendSceneIntro(channel: TextChannel, filename: string) {
   const content = fs.readFileSync(path.join(__dirname, 'scene-intros', filename), 'utf-8');
@@ -36,14 +37,10 @@ async function getEffectiveVariableValues(
   area: GardenArea,
   variableIds: ['barbaraSpouse', ...GardenVariableId[]],
 ) {
-  const variableValues = await Promise.all(
-    variableIds.map(
-      async (variableId) =>
-        [variableId, await getGardenVar(managedGuild, variableId, area)] as const,
-    ),
-  );
-  const barbaraSpouseValue = variableValues[0][1];
-  const effectiveValues = variableValues.map(([variableId, value]) => {
+  const variableValues = await getGardenVars(managedGuild, area, ...variableIds);
+  const barbaraSpouseValue = variableValues[0];
+  const effectiveValues = variableIds.map((variableId, index) => {
+    const value = variableValues[index];
     if (variableId === 'spouseCheated') {
       // William never cheats; if Barbara married William the spouseCheated value is always F
       return barbaraSpouseValue === 'B' ? 'F' : value;
