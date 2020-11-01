@@ -1,6 +1,7 @@
 import { Channel, Client, Guild, GuildChannel, Role, TextChannel, VoiceChannel } from 'discord.js';
 import { handleCommand } from './commandHandlers';
 import { Game } from './game';
+import logger from './logger';
 
 export type ManagedGuild = {
   areaTextChannels: Map<string, TextChannel>;
@@ -63,7 +64,7 @@ function checkReadyToPlay(managedGuild: ManagedGuild) {
   } else {
     if (!managedGuild.readyToPlay) {
       guild.systemChannel?.send('Errors corrected!  Ready to play.');
-      console.log(`${guild.name} is ready to play`);
+      logger.info(`${guild.name} is ready to play`);
     }
     managedGuild.readyToPlay = true;
   }
@@ -152,7 +153,7 @@ export function setupClient(client: Client) {
     const command = match[1].toLowerCase();
     const args = match[2]?.trim() ?? '';
 
-    console.log(`>> ${msg.member?.user.tag}: ${msg.content}`);
+    logger.info(`>> ${msg.member?.user.tag}: ${msg.content}`);
     await handleCommand(managedGuild, managedGuild.game, msg, command, args);
   });
 }

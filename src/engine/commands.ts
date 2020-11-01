@@ -4,6 +4,7 @@ import { getGameScene, setGameScene } from './database';
 import { Area, AreaSetup, Game, GameVariableBase, Scene } from './game';
 import { loadRolesForGuild, ManagedGuild } from './managedGuild';
 import { notEmpty } from '../utils';
+import logger from './logger';
 
 export type PlacementResult = {
   member: GuildMember;
@@ -20,7 +21,7 @@ async function placeCharacter<VariableType extends GameVariableBase>(
   game: Game<VariableType>,
 ): Promise<PlacementResult[]> {
   if (primaryRole.members.size === 0) {
-    console.warn(`No player for ${primaryRole.name}`);
+    logger.debug(`No player for ${primaryRole.name}`);
   }
 
   const promises = primaryRole.members.array().map(async (member) => {
@@ -36,7 +37,7 @@ async function placeCharacter<VariableType extends GameVariableBase>(
       return !secondaryRole || role.name !== secondaryRole.name;
     });
 
-    console.log(
+    logger.debug(
       `Giving ${member.user.tag} ${rolesToAdd.map((role) => role.name).join(', ')}, moving to ${
         voiceChannel.name
       }${

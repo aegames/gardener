@@ -4,6 +4,7 @@ import { prepNextScene, prepScene, PrepSceneResults } from './commands';
 import { Game, GameVariableBase } from './game';
 import { ManagedGuild } from './managedGuild';
 import { notEmpty } from '../utils';
+import logger from './logger';
 
 export type CommandHandler = (
   managedGuild: ManagedGuild,
@@ -41,15 +42,21 @@ function formatPrepSceneResults<VariableType extends GameVariableBase>(
   }
 }
 
+async function replyWithPrepSceneResults(msg: Message, results: PrepSceneResults<any>) {
+  const reply = `Prepped ${results.scene.name}${formatPrepSceneResults(results)}`;
+  reply.split('\n').forEach((line) => logger.info(line));
+  return await msg.reply(reply);
+}
+
 const prep: CommandHandler = async (managedGuild, msg, args) => {
   if (args === 'next') {
     const results = await prepNextScene(managedGuild);
-    msg.reply(`Prepped ${results.scene.name}${formatPrepSceneResults(results)}`);
+    await replyWithPrepSceneResults(msg, results);
   } else {
     const scene = managedGuild.game.scenes.find((scene) => scene.name === args);
     if (scene) {
       const results = await prepScene(managedGuild, scene);
-      msg.reply(`Prepped ${results.scene.name}${formatPrepSceneResults(results)}`);
+      await replyWithPrepSceneResults(msg, results);
     } else {
       msg.reply(
         `Invalid command.  To prep a scene, you can say:\n!prep next (for the next scene)\n${managedGuild.game.scenes
@@ -77,7 +84,7 @@ export async function handleCommand(
     try {
       await dispatcher(managedGuild, msg, args);
     } catch (error) {
-      console.error(error);
+      logger.error(error);
       msg.reply(error.message);
     }
   }
