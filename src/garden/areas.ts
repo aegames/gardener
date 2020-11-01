@@ -1,4 +1,4 @@
-import { Area } from '../src/game';
+import { Area } from '../engine/game';
 import { buildTimelineVariables, GardenVariable } from './variables';
 
 export type GardenAreaName = 'The Funeral Home' | 'Area 1' | 'Area 2' | 'Area 3';

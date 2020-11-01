@@ -1,5 +1,5 @@
 import { cloneDeep, keyBy } from 'lodash';
-import { GameVariableBase } from '../src/game';
+import { GameVariableBase } from '../engine/game';
 
 export type ChoiceVariable = GameVariableBase & {
   type: 'choice';

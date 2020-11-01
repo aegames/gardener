@@ -1,6 +1,6 @@
-import { getVariableValue } from '../src/gameLogic';
-import { ManagedGuild } from '../src/managedGuild';
-import { Game } from '../src/game';
+import { getVariableValue } from '../engine/gameLogic';
+import { ManagedGuild } from '../engine/managedGuild';
+import { Game } from '../engine/game';
 import { areas, GardenArea } from './areas';
 import {
   frameCharacters,

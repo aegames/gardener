@@ -1,10 +1,10 @@
-import { sendFiles, sendLongMessage } from '../src/commands';
+import { sendFiles, sendLongMessage } from '../engine/commands';
 import { GardenArea } from './areas';
 import { GardenScene } from './scenes';
 import path from 'path';
 import fs from 'fs';
 import { TextChannel } from 'discord.js';
-import { ManagedGuild } from '../src/managedGuild';
+import { ManagedGuild } from '../engine/managedGuild';
 import { getGardenVar } from './gardenGame';
 import { GardenVariableId } from './variables';
 

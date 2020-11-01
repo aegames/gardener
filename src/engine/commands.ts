@@ -3,7 +3,7 @@ import { flatMap, flatten } from 'lodash';
 import { getGameScene, setGameScene } from './database';
 import { Area, AreaSetup, Game, GameVariableBase, Scene } from './game';
 import { loadRolesForGuild, ManagedGuild } from './managedGuild';
-import { notEmpty } from './utils';
+import { notEmpty } from '../utils';
 
 export type PlacementResult = {
   member: GuildMember;

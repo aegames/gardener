@@ -1,4 +1,4 @@
-import { CommandHandler } from '../src/commandHandlers';
+import { CommandHandler } from '../engine/commandHandlers';
 import { makeChoice } from './choices';
 
 export const choose: CommandHandler = async (managedGuild, msg, args) => {

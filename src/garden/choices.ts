@@ -1,14 +1,14 @@
 import { GuildMember } from 'discord.js';
-import { findAreaForPrimaryCharacterRole } from '../src/game';
-import { getPrimaryCharacterRole } from '../src/commands';
-import { getGameScene, setGameVariableValue } from '../src/database';
-import { ManagedGuild } from '../src/managedGuild';
+import { findAreaForPrimaryCharacterRole } from '../engine/game';
+import { getPrimaryCharacterRole } from '../engine/commands';
+import { getGameScene, setGameVariableValue } from '../engine/database';
+import { ManagedGuild } from '../engine/managedGuild';
 import { flatMap } from 'lodash';
 import { GardenScene } from './scenes';
 import { GardenArea } from './areas';
 import { gardenGame, getGardenVar } from './gardenGame';
 import { ChoiceVariable } from './variables';
-import { notEmpty } from '../src/utils';
+import { notEmpty } from '../utils';
 
 async function getSceneChoices(
   managedGuild: ManagedGuild,

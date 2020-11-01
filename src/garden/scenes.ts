@@ -1,4 +1,4 @@
-import { AreaSetup, CharacterType, Scene } from '../src/game';
+import { AreaSetup, CharacterType, Scene } from '../engine/game';
 import { areas } from './areas';
 import {
   frameCharacters,

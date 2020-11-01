@@ -3,7 +3,7 @@ import { flatMap } from 'lodash';
 import { prepNextScene, prepScene, PrepSceneResults } from './commands';
 import { Game, GameVariableBase } from './game';
 import { ManagedGuild } from './managedGuild';
-import { notEmpty } from './utils';
+import { notEmpty } from '../utils';
 
 export type CommandHandler = (
   managedGuild: ManagedGuild,

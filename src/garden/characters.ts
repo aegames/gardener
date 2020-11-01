@@ -1,5 +1,5 @@
 import { keyBy } from 'lodash';
-import { Character, CharacterType } from '../src/game';
+import { Character, CharacterType } from '../engine/game';
 
 export const frameCharacterType: CharacterType = {
   name: 'Frame Character',

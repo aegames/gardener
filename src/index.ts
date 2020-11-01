@@ -2,8 +2,8 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import DiscordJS from 'discord.js';
-import { bringGuildUnderManagement, setupClient } from './managedGuild';
-import { gardenGame } from '../garden/gardenGame';
+import { bringGuildUnderManagement, setupClient } from './engine/managedGuild';
+import { gardenGame } from './garden/gardenGame';
 
 const client = new DiscordJS.Client();
 
