@@ -13,7 +13,7 @@ import { GardenVariable, GardenVariableId } from './variables';
 import { postPrepGardenScene } from './postPrep';
 import { choose } from './commands';
 import { prePrepGardenScene } from './prePrep';
-import { buildCommonCommandHandlers } from '../engine/commandHandlers';
+import { commonCommandHandlers } from '../engine/commandHandlers';
 
 export const gardenGame: Game<GardenVariable> = {
   areas: new Map(Object.entries(areas)),
@@ -22,17 +22,15 @@ export const gardenGame: Game<GardenVariable> = {
     ['inner', innerCharacterType],
   ]),
   characters: new Map([...Object.entries(frameCharacters), ...Object.entries(innerCharacters)]),
-  commandHandlers: {},
+  commandHandlers: {
+    ...commonCommandHandlers,
+    choose,
+  },
   globalVariables: new Map(),
   prePrepScene: prePrepGardenScene,
   postPrepScene: postPrepGardenScene,
   sceneNames: scenes.map((scene) => scene.name),
   scenes,
-};
-
-gardenGame.commandHandlers = {
-  ...buildCommonCommandHandlers(gardenGame),
-  choose,
 };
 
 export async function getGardenVar(

@@ -99,7 +99,7 @@ async function lockArea(managedGuild: ManagedGuild, area: Area<any>) {
   ]);
 }
 
-async function setupArea(managedGuild: ManagedGuild, areaSetup: AreaSetup<any>) {
+async function setupArea(managedGuild: ManagedGuild, game: Game<any>, areaSetup: AreaSetup<any>) {
   const voiceChannel = managedGuild.areaVoiceChannels.get(areaSetup.area.name);
   const textChannel = managedGuild.areaTextChannels.get(areaSetup.area.name);
   if (!voiceChannel || !textChannel) {
@@ -109,7 +109,7 @@ async function setupArea(managedGuild: ManagedGuild, areaSetup: AreaSetup<any>) 
   }
 
   // Refresh roles in case they changed
-  await loadRolesForGuild(managedGuild);
+  await loadRolesForGuild(managedGuild, game);
 
   const primaryRoles = areaSetup.placements
     .map((placement) => managedGuild.characterRoles.get(placement.primaryCharacter.name))
@@ -140,9 +140,9 @@ async function setupArea(managedGuild: ManagedGuild, areaSetup: AreaSetup<any>) 
         );
       }
 
-      return [placeCharacter(voiceChannel, primaryRole, secondaryRole, managedGuild.game)];
+      return [placeCharacter(voiceChannel, primaryRole, secondaryRole, game)];
     } else {
-      return [placeCharacter(voiceChannel, primaryRole, undefined, managedGuild.game)];
+      return [placeCharacter(voiceChannel, primaryRole, undefined, game)];
     }
   });
 
@@ -172,15 +172,14 @@ export async function sendFiles(channel: TextChannel, files: string[]) {
 
 export async function prepScene<VariableType extends GameVariableBase>(
   managedGuild: ManagedGuild,
+  game: Game<VariableType>,
   scene: Scene<VariableType>,
 ): Promise<PrepSceneResults<VariableType>> {
   const areaSetups = scene.areaSetups ?? [];
   const activeAreas = areaSetups.map((areaSetup) => areaSetup.area);
   const areaNames = new Set(activeAreas.map((area) => area.name));
-  const unusedAreas = [...managedGuild.game.areas.values()].filter(
-    (area) => !areaNames.has(area.name),
-  );
-  const { prePrepScene, postPrepScene } = managedGuild.game;
+  const unusedAreas = [...game.areas.values()].filter((area) => !areaNames.has(area.name));
+  const { prePrepScene, postPrepScene } = game;
   if (prePrepScene) {
     const prePrepResults = await Promise.allSettled(
       activeAreas.map((area) => prePrepScene(managedGuild, scene, area)),
@@ -195,7 +194,7 @@ export async function prepScene<VariableType extends GameVariableBase>(
 
   await setGameScene(managedGuild, scene);
   const areaSetupResults = await Promise.all<any>([
-    ...areaSetups.map((areaSetup) => setupArea(managedGuild, areaSetup)),
+    ...areaSetups.map((areaSetup) => setupArea(managedGuild, game, areaSetup)),
     ...unusedAreas.map((area) => lockArea(managedGuild, area)),
   ]);
 
@@ -212,21 +211,19 @@ export async function prepScene<VariableType extends GameVariableBase>(
   return { scene, areaSetupResults };
 }
 
-export async function prepNextScene(managedGuild: ManagedGuild) {
-  const currentScene = await getGameScene(managedGuild, managedGuild.game);
+export async function prepNextScene(managedGuild: ManagedGuild, game: Game<any>) {
+  const currentScene = await getGameScene(managedGuild, game);
   if (currentScene == null) {
     throw new Error('There is no active scene right now.');
   }
 
   const nextScene =
-    managedGuild.game.scenes[
-      managedGuild.game.scenes.findIndex((scene) => scene.name === currentScene.name) + 1
-    ];
+    game.scenes[game.scenes.findIndex((scene) => scene.name === currentScene.name) + 1];
   if (nextScene == null) {
     throw new Error('This is the last scene in the game.');
   }
 
-  return await prepScene(managedGuild, nextScene);
+  return await prepScene(managedGuild, game, nextScene);
 }
 
 export function getMemberCharacters(member: GuildMember, game: Game<any>) {

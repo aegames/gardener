@@ -15,14 +15,15 @@ import {
 } from './database';
 import { resolveVariable } from './gameLogic';
 
-export type CommandHandler = (
+export type CommandHandler<VariableType extends GameVariableBase> = (
   managedGuild: ManagedGuild,
+  game: Game<VariableType>,
   msg: Message,
   args: string,
-) => Promise<any> | void;
+) => Promise<any>;
 
-const list: CommandHandler = (managedGuild, msg) => {
-  msg.reply(
+const list: CommandHandler<any> = async (managedGuild, game, msg) => {
+  await msg.reply(
     managedGuild.guild.channels.cache
       .filter((channel) => channel.type === 'voice')
       .map((channel) => channel.name)
@@ -30,17 +31,14 @@ const list: CommandHandler = (managedGuild, msg) => {
   );
 };
 
-function buildHelpHandlerForGame(game: Game<any>) {
-  const handler: CommandHandler = async (managedGuild, msg) => {
-    msg.reply(
-      `Available commands:\n${Object.keys(game.commandHandlers)
-        .sort()
-        .map((commandName) => `!${commandName}`)
-        .join('\n')}`,
-    );
-  };
-  return handler;
-}
+const helpHandler: CommandHandler<any> = async (managedGuild, game, msg) => {
+  await msg.reply(
+    `Available commands:\n${Object.keys(game.commandHandlers)
+      .sort()
+      .map((commandName) => `!${commandName}`)
+      .join('\n')}`,
+  );
+};
 
 function formatPrepSceneResults<VariableType extends GameVariableBase>(
   results: PrepSceneResults<VariableType>,
@@ -69,21 +67,21 @@ async function replyWithPrepSceneResults(msg: Message, results: PrepSceneResults
   return await msg.reply(reply);
 }
 
-const prep: CommandHandler = async (managedGuild, msg, args) => {
+const prep: CommandHandler<any> = async (managedGuild, game, msg, args) => {
   if (args === 'next') {
-    const results = await prepNextScene(managedGuild);
+    const results = await prepNextScene(managedGuild, game);
     await replyWithPrepSceneResults(msg, results);
   } else if (args === 'first') {
-    const results = await prepScene(managedGuild, managedGuild.game.scenes[0]);
+    const results = await prepScene(managedGuild, game, game.scenes[0]);
     await replyWithPrepSceneResults(msg, results);
   } else {
-    const scene = managedGuild.game.scenes.find((scene) => scene.name === args);
+    const scene = game.scenes.find((scene) => scene.name === args);
     if (scene) {
-      const results = await prepScene(managedGuild, scene);
+      const results = await prepScene(managedGuild, game, scene);
       await replyWithPrepSceneResults(msg, results);
     } else {
       msg.reply(
-        `Invalid command.  To prep a scene, you can say:\n!prep next (for the next scene)\n${managedGuild.game.scenes
+        `Invalid command.  To prep a scene, you can say:\n!prep next (for the next scene)\n${game.scenes
           .map((scene) => `!prep ${scene.name}`)
           .join('\n')}`,
       );
@@ -91,40 +89,35 @@ const prep: CommandHandler = async (managedGuild, msg, args) => {
   }
 };
 
-export function buildGetHandlerForGame<VariableType extends GameVariableBase>(
-  game: Game<VariableType>,
-) {
-  const handler: CommandHandler = async (managedGuild, msg, args) => {
-    if (args !== '') {
-      const variableIds = args.split(/\s+/);
-      const values = await getQualifiedVariableValues(managedGuild, ...variableIds);
-      msg.reply(
-        variableIds.map((variableId, index) => `${variableId} = ${JSON.stringify(values[index])}`),
-      );
-    } else {
-      const variables = [
-        ...[...game.globalVariables.values()].map((variable) =>
-          resolveVariable(game, { variableId: variable.id, scope: 'global' as const }, {}),
+const getHandler: CommandHandler<any> = async (managedGuild, game, msg, args) => {
+  if (args !== '') {
+    const variableIds = args.split(/\s+/);
+    const values = await getQualifiedVariableValues(managedGuild, ...variableIds);
+    msg.reply(
+      variableIds.map((variableId, index) => `${variableId} = ${JSON.stringify(values[index])}`),
+    );
+  } else {
+    const variables = [
+      ...[...game.globalVariables.values()].map((variable) =>
+        resolveVariable(game, { variableId: variable.id, scope: 'global' as const }, {}),
+      ),
+      ...flatMap([...game.areas.values()], (area) =>
+        Object.values(area.variables).map((variable: GameVariableBase) =>
+          resolveVariable(game, { variableId: variable.id, scope: 'area' as const }, { area }),
         ),
-        ...flatMap([...game.areas.values()], (area) =>
-          Object.values(area.variables).map((variable: VariableType) =>
-            resolveVariable(game, { variableId: variable.id, scope: 'area' as const }, { area }),
-          ),
-        ),
-      ].filter(notEmpty);
-      const values = await getGameVariableValues(managedGuild, ...variables);
-      msg.reply(
-        variables.map(
-          (variable, index) =>
-            `${getQualifiedVariableId(variable)} = ${JSON.stringify(values[index])}`,
-        ),
-      );
-    }
-  };
-  return handler;
-}
+      ),
+    ].filter(notEmpty);
+    const values = await getGameVariableValues(managedGuild, ...variables);
+    msg.reply(
+      variables.map(
+        (variable, index) =>
+          `${getQualifiedVariableId(variable)} = ${JSON.stringify(values[index])}`,
+      ),
+    );
+  }
+};
 
-const setHandler: CommandHandler = async (managedGuild, msg, args) => {
+const setHandler: CommandHandler<any> = async (managedGuild, game, msg, args) => {
   const [variableId, ...rest] = args.split(' ');
   if (!variableId) {
     throw new Error('Please provide a variable ID to set.');
@@ -140,7 +133,7 @@ const setHandler: CommandHandler = async (managedGuild, msg, args) => {
   msg.reply(`Set ${variableId} to ${JSON.stringify(value)}`);
 };
 
-const resetgame: CommandHandler = async (managedGuild, msg, args) => {
+const resetgame: CommandHandler<any> = async (managedGuild, game, msg, args) => {
   if (args === 'confirm') {
     await deleteGameData(managedGuild);
     msg.reply('Game data reset.');
@@ -149,18 +142,14 @@ const resetgame: CommandHandler = async (managedGuild, msg, args) => {
   }
 };
 
-export function buildCommonCommandHandlers<VariableType extends GameVariableBase>(
-  game: Game<VariableType>,
-) {
-  return {
-    help: buildHelpHandlerForGame(game),
-    list,
-    prep,
-    get: buildGetHandlerForGame(game),
-    set: setHandler,
-    resetgame,
-  };
-}
+export const commonCommandHandlers = {
+  help: helpHandler,
+  list,
+  prep,
+  get: getHandler,
+  set: setHandler,
+  resetgame,
+};
 
 export async function handleCommand(
   managedGuild: ManagedGuild,
@@ -174,7 +163,7 @@ export async function handleCommand(
     msg.reply(`Unknown command: ${command}.  To see available commands, say \`!help\`.`);
   } else {
     try {
-      await dispatcher(managedGuild, msg, args);
+      await dispatcher(managedGuild, game, msg, args);
     } catch (error) {
       logger.error(error);
       msg.reply(error.message);

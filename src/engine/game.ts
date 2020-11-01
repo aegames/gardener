@@ -47,7 +47,7 @@ export type Game<VariableType extends GameVariableBase> = {
   areas: Map<string, Area<VariableType>>;
   characters: Map<string, Character>;
   characterTypes: Map<string, CharacterType>;
-  commandHandlers: Dictionary<CommandHandler>;
+  commandHandlers: Dictionary<CommandHandler<VariableType>>;
   globalVariables: Map<string, VariableType>;
   prePrepScene?: (
     managedGuild: ManagedGuild,
