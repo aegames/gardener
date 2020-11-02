@@ -1,15 +1,14 @@
-import { Message } from 'discord.js';
+import { GuildMember, Message } from 'discord.js';
 import { flatMap } from 'lodash';
 import { prepNextScene, prepScene, PrepSceneResults } from './commands';
 import { Game, GameVariableBase } from './game';
-import { ManagedGuild } from './managedGuild';
+import { checkReadyToPlay, ManagedGuild } from './managedGuild';
 import { notEmpty } from '../utils';
 import logger from './logger';
 import {
   deleteGameData,
   getGameVariableValues,
   getQualifiedVariableId,
-  getQualifiedVariableValue,
   getQualifiedVariableValues,
   setQualifiedVariableValue,
 } from './database';
@@ -22,14 +21,16 @@ export type CommandHandler<VariableType extends GameVariableBase> = (
   args: string,
 ) => Promise<any>;
 
-const list: CommandHandler<any> = async (managedGuild, game, msg) => {
-  await msg.reply(
-    managedGuild.guild.channels.cache
-      .filter((channel) => channel.type === 'voice')
-      .map((channel) => channel.name)
-      .join(', '),
-  );
-};
+export function assertHasGMRole(managedGuild: ManagedGuild, member: GuildMember | null) {
+  const gmRole = managedGuild.gmRole;
+  if (!gmRole) {
+    throw new Error('Guild has no GM role');
+  }
+
+  if (!member?.roles.cache.has(gmRole.id)) {
+    throw new Error('Sorry, only GMs can do that.');
+  }
+}
 
 const helpHandler: CommandHandler<any> = async (managedGuild, game, msg) => {
   await msg.reply(
@@ -68,6 +69,8 @@ async function replyWithPrepSceneResults(msg: Message, results: PrepSceneResults
 }
 
 const prep: CommandHandler<any> = async (managedGuild, game, msg, args) => {
+  assertHasGMRole(managedGuild, msg.member);
+
   if (args === 'next') {
     const results = await prepNextScene(managedGuild, game);
     await replyWithPrepSceneResults(msg, results);
@@ -90,6 +93,8 @@ const prep: CommandHandler<any> = async (managedGuild, game, msg, args) => {
 };
 
 const getHandler: CommandHandler<any> = async (managedGuild, game, msg, args) => {
+  assertHasGMRole(managedGuild, msg.member);
+
   if (args !== '') {
     const variableIds = args.split(/\s+/);
     const values = await getQualifiedVariableValues(managedGuild, ...variableIds);
@@ -118,6 +123,8 @@ const getHandler: CommandHandler<any> = async (managedGuild, game, msg, args) =>
 };
 
 const setHandler: CommandHandler<any> = async (managedGuild, game, msg, args) => {
+  assertHasGMRole(managedGuild, msg.member);
+
   const [variableId, ...rest] = args.split(' ');
   if (!variableId) {
     throw new Error('Please provide a variable ID to set.');
@@ -134,6 +141,8 @@ const setHandler: CommandHandler<any> = async (managedGuild, game, msg, args) =>
 };
 
 const resetgame: CommandHandler<any> = async (managedGuild, game, msg, args) => {
+  assertHasGMRole(managedGuild, msg.member);
+
   if (args === 'confirm') {
     await deleteGameData(managedGuild);
     msg.reply('Game data reset.');
@@ -144,7 +153,6 @@ const resetgame: CommandHandler<any> = async (managedGuild, game, msg, args) => 
 
 export const commonCommandHandlers = {
   help: helpHandler,
-  list,
   prep,
   get: getHandler,
   set: setHandler,
@@ -158,6 +166,14 @@ export async function handleCommand(
   command: string,
   args: string,
 ) {
+  if (!managedGuild.readyToPlay) {
+    const result = checkReadyToPlay(managedGuild, game);
+    if (!result.readyToPlay) {
+      msg.reply(result.errorMessage);
+      return;
+    }
+  }
+
   const dispatcher = game.commandHandlers[command];
   if (dispatcher == null) {
     msg.reply(`Unknown command: ${command}.  To see available commands, say \`!help\`.`);

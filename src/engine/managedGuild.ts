@@ -7,6 +7,7 @@ export type ManagedGuild = {
   areaTextChannels: Map<string, TextChannel>;
   areaVoiceChannels: Map<string, VoiceChannel>;
   characterRoles: Map<string, Role>;
+  gmRole?: Role;
   guild: Guild;
   readyToPlay: boolean;
 };
@@ -29,7 +30,10 @@ export function getAreaVoiceChannel(managedGuild: ManagedGuild, areaName: string
   return managedGuild.areaVoiceChannels.get(areaName);
 }
 
-function checkReadyToPlay(managedGuild: ManagedGuild, game: Game<any>) {
+export function checkReadyToPlay(
+  managedGuild: ManagedGuild,
+  game: Game<any>,
+): { readyToPlay: true; errorMessage: undefined } | { readyToPlay: false; errorMessage: string } {
   const { guild } = managedGuild;
   const areaNames = [...game.areas.values()].map((area) => area.name);
   const missingAreaTextChannels = findMissing(
@@ -55,18 +59,33 @@ function checkReadyToPlay(managedGuild: ManagedGuild, game: Game<any>) {
   if (missingRoles.length > 0) {
     errors.push(`Missing roles for ${missingRoles.join(', ')}!`);
   }
+  if (!managedGuild.gmRole) {
+    errors.push('Missing GM role');
+  }
 
   if (errors.length > 0) {
-    guild.systemChannel?.send(
-      [...errors, "Can't start game until these errors are fixed."].join('\n'),
-    );
+    const errorMessage = [...errors, "Can't start game until these errors are fixed."].join('\n');
     managedGuild.readyToPlay = false;
+    return { readyToPlay: false, errorMessage };
   } else {
     if (!managedGuild.readyToPlay) {
-      guild.systemChannel?.send('Errors corrected!  Ready to play.');
       logger.info(`${guild.name} is ready to play`);
     }
     managedGuild.readyToPlay = true;
+    return { readyToPlay: true, errorMessage: undefined };
+  }
+}
+
+async function checkReadyToPlayAndReportInSystemChannel(
+  managedGuild: ManagedGuild,
+  game: Game<any>,
+) {
+  const previouslyReady = managedGuild.readyToPlay;
+  const result = checkReadyToPlay(managedGuild, game);
+  if (!previouslyReady && result.readyToPlay) {
+    await managedGuild.guild.systemChannel?.send('Errors corrected!  Ready to play.');
+  } else if (!result.readyToPlay) {
+    await managedGuild.guild.systemChannel?.send(result.errorMessage);
   }
 }
 
@@ -94,15 +113,19 @@ function loadAreaChannelsForGuild(managedGuild: ManagedGuild, game: Game<any>) {
 
 export async function loadRolesForGuild(managedGuild: ManagedGuild, game: Game<any>) {
   const characterRoles = new Map<string, Role>();
+  let gmRole: Role | undefined;
 
   const roles = await managedGuild.guild.roles.fetch();
   roles.cache.forEach((role) => {
-    if (game.characters.has(role.name)) {
+    if (role.name === 'GM') {
+      gmRole = role;
+    } else if (game.characters.has(role.name)) {
       characterRoles.set(role.name, role);
     }
   });
 
   managedGuild.characterRoles = characterRoles;
+  managedGuild.gmRole = gmRole;
 }
 
 function channelIsGuildChannel(channel: Channel): channel is GuildChannel {
@@ -114,7 +137,7 @@ function maybeLoadGuildChannels(channel: Channel, game: Game<any>) {
     const managedGuild = managedGuildsByGuildId.get(channel.guild.id);
     if (managedGuild) {
       loadAreaChannelsForGuild(managedGuild, game);
-      checkReadyToPlay(managedGuild, game);
+      checkReadyToPlayAndReportInSystemChannel(managedGuild, game);
     }
   }
 }
@@ -123,7 +146,7 @@ async function maybeLoadGuildRoles(role: Role, game: Game<any>) {
   const managedGuild = managedGuildsByGuildId.get(role.guild.id);
   if (managedGuild) {
     await loadRolesForGuild(managedGuild, game);
-    checkReadyToPlay(managedGuild, game);
+    checkReadyToPlayAndReportInSystemChannel(managedGuild, game);
   }
 }
 
@@ -163,7 +186,7 @@ export function setupClient(game: Game<any>) {
   });
 
   client.on('ready', async () => {
-    console.log(`Logged in as ${client.user?.tag}!`);
+    logger.info(`Logged in as ${client.user?.tag}!`);
     client.guilds.cache.forEach(async (guild) => {
       bringGuildUnderManagement(guild, game);
     });
@@ -186,5 +209,5 @@ export async function bringGuildUnderManagement(guild: Guild, game: Game<any>) {
 
   loadAreaChannelsForGuild(managedGuild, game);
   await loadRolesForGuild(managedGuild, game);
-  checkReadyToPlay(managedGuild, game);
+  checkReadyToPlayAndReportInSystemChannel(managedGuild, game);
 }

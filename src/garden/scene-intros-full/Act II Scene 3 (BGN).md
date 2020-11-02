@@ -1,0 +1,8 @@
+**Year: 1993**
+
+This party marks Stephanie's 23rd birthday and she has brought her boyfriend, Zack Bloom. Zack and Stephanie know each other from high school, and Zack has had a troubled past. He went to juvie several times for drug-related offenses and assault. While he hasn't been arrested since he turned 18, Barbara is not certain she trusts his claims of being clean. There were rumors that he was dealing serious drugs to his classmates, and even that he was part of a gang. His tattoos and shaved head don't make him easy to trust.
+
+Stephanie had a hard few years after the drunk driving incident. Losing her driver's license and her job just sent her into a downward spiral. She wound up getting involved in drugs and going through court-mandated rehab. However, since William died of a sudden heart attack a few years back, Stephanie has pulled herself together. After his death, she took some of the money she inherited and went into therapy. She got a job at the supermarket and moved out into a small apartment in town. Since William's death, Charles has also tried to help out with Stephanie's recovery. He sees a lot of himself in her struggles.
+
+Stephanie ran into Zack at the supermarket and they began reminiscing about high school. Soon enough they were dating, and now, almost six months later, they have come to this party to announce their engagement. Barbara is happy that Stephanie has found someone, but she is worried about Zack. She really hoped that Stephanie would pull herself together and go to college, and now she's afraid that won't happen. She's even more worried that Zack might still be dealing, and that this could set Stephanie up for a relapse.
+

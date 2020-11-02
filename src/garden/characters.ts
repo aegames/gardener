@@ -8,7 +8,7 @@ export const frameCharacterType: CharacterType = {
 
 export const innerCharacterType: CharacterType = {
   name: 'Inner Character',
-  primary: true,
+  primary: false,
 };
 
 const frameCharacterNames = [

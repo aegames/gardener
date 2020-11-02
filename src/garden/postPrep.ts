@@ -1,33 +1,22 @@
-import { sendFiles, sendLongMessage } from '../engine/commands';
 import { GardenArea } from './areas';
 import { GardenScene } from './scenes';
 import path from 'path';
 import fs from 'fs';
-import { TextChannel } from 'discord.js';
+import { MessageAttachment, MessageEmbed, TextChannel } from 'discord.js';
 import { ManagedGuild } from '../engine/managedGuild';
-import { getGardenVars } from './gardenGame';
-import { GardenVariableId } from './variables';
-import logger from '../engine/logger';
+import { gardenGame, getGardenVars } from './gardenGame';
+import { ChoiceVariable, GardenVariableId } from './variables';
+import { innerCharacterType } from './characters';
+import { getSceneChoices } from './choices';
+import { flatMap, flatten } from 'lodash';
 
-async function sendSceneIntro(channel: TextChannel, filename: string) {
-  const content = fs.readFileSync(path.join(__dirname, 'scene-intros', filename), 'utf-8');
-  return await sendLongMessage(channel, content);
-}
-
-async function sendInnerCharacterSheets(
-  channel: TextChannel,
-  sceneFilenamePortion: string,
-  characterNames: string[],
-) {
-  await sendFiles(
-    channel,
-    characterNames.map((characterName) =>
-      path.join(
-        __dirname,
-        'inner-character-sheets',
-        characterName,
-        `${characterName} - ${sceneFilenamePortion}.pdf`,
-      ),
+function getInnerCharacterSheetFilenames(sceneFilenamePortion: string, characterNames: string[]) {
+  return characterNames.map((characterName) =>
+    path.join(
+      __dirname,
+      'inner-character-packets',
+      characterName,
+      `${characterName} - ${sceneFilenamePortion}.pdf`,
     ),
   );
 }
@@ -60,13 +49,66 @@ async function buildVariant(
   return `(${effectiveValues.join('')})`;
 }
 
+function describeChoiceValue(variable: ChoiceVariable, value: string) {
+  const choice = variable.choices.find((choice) => choice.value === value);
+  if (!choice) {
+    return `${value}: Unrecognized choice value`;
+  }
+
+  return `${choice.value}: ${choice.label}`;
+}
+
 async function sendInnerSceneMaterials(
+  managedGuild: ManagedGuild,
   channel: TextChannel,
+  scene: GardenScene,
+  area: GardenArea,
   sceneFilenamePortion: string,
   characterNames: string[],
 ) {
-  await sendSceneIntro(channel, `${sceneFilenamePortion}.md`);
-  await sendInnerCharacterSheets(channel, sceneFilenamePortion, characterNames);
+  const sceneIntro = fs.readFileSync(
+    path.join(__dirname, 'scene-intros', `${sceneFilenamePortion}.md`),
+    'utf-8',
+  );
+  const sceneIndex = gardenGame.scenes.findIndex((otherScene) => otherScene.name === scene.name);
+  const priorScenes = gardenGame.scenes.slice(0, sceneIndex) as GardenScene[];
+  const priorChoices = flatten(
+    await Promise.all(
+      priorScenes.map((priorScene) => getSceneChoices(managedGuild, priorScene, area)),
+    ),
+  );
+  const priorChoiceValues = await getGardenVars(
+    managedGuild,
+    area,
+    ...priorChoices.map((choiceVariable) => choiceVariable.id),
+  );
+  const priorChoiceText = priorChoices
+    .map(
+      (choiceVariable, index) =>
+        `_${describeChoiceValue(choiceVariable, priorChoiceValues[index])}_`,
+    )
+    .join('\n');
+
+  const currentChoices = await getSceneChoices(managedGuild, scene, area);
+  const currentChoiceText = flatMap(currentChoices, (choiceVariable) =>
+    choiceVariable.choices.map((choice) => describeChoiceValue(choiceVariable, choice.value)),
+  );
+
+  const embed = new MessageEmbed()
+    .setColor(0x0099ff)
+    .setDescription(sceneIntro)
+    .setTitle(scene.name)
+    .addFields(
+      { name: 'Choices so far', value: priorChoiceText, inline: true },
+      { name: 'Choices for this scene', value: currentChoiceText, inline: true },
+    )
+    .attachFiles(
+      getInnerCharacterSheetFilenames(sceneFilenamePortion, characterNames).map(
+        (filename) => new MessageAttachment(filename),
+      ),
+    );
+
+  await channel.send(embed);
 }
 
 async function sendInnerSceneMaterialsWithVariant(
@@ -78,7 +120,14 @@ async function sendInnerSceneMaterialsWithVariant(
 ) {
   const channel = managedGuild.areaTextChannels.get(area.name)!;
   const variant = await buildVariant(managedGuild, area, variantVariableIds);
-  await sendInnerSceneMaterials(channel, `${scene.name} ${variant}`, characterNames);
+  await sendInnerSceneMaterials(
+    managedGuild,
+    channel,
+    scene,
+    area,
+    `${scene.name} ${variant}`,
+    characterNames,
+  );
 }
 
 const act1Characters = ['Barbara', 'Charles', 'William', 'Virginia'];
@@ -92,7 +141,10 @@ export async function postPrepGardenScene(
 ) {
   if (scene.name === 'Act I Scene 1') {
     await sendInnerSceneMaterials(
+      managedGuild,
       managedGuild.areaTextChannels.get(area.name)!,
+      scene,
+      area,
       scene.name,
       act1Characters,
     );
@@ -127,7 +179,10 @@ export async function postPrepGardenScene(
     ]);
     const variant = barbaraSpouse === 'A' ? (barbaraCheated === 'C' ? 'ACFHI' : 'ADEHJ') : 'BGI';
     await sendInnerSceneMaterials(
+      managedGuild,
       managedGuild.areaTextChannels.get(area.name)!,
+      scene,
+      area,
       `${scene.name} (${variant})`,
       act2Part1Characters,
     );
@@ -155,5 +210,8 @@ export async function postPrepGardenScene(
       ['barbaraSpouse', 'divorce', 'virginiaNursingHome', 'drunkDrivingConsequences', 'acceptZach'],
       act2Part2Characters,
     );
+  }
+
+  if (scene.characterType.name === innerCharacterType.name) {
   }
 }

@@ -10,7 +10,7 @@ import { gardenGame, getGardenVar, setGardenVar } from './gardenGame';
 import { ChoiceVariable } from './variables';
 import { notEmpty } from '../utils';
 
-async function getSceneChoices(
+export async function getSceneChoices(
   managedGuild: ManagedGuild,
   scene: GardenScene,
   area: GardenArea,
@@ -88,7 +88,7 @@ export async function makeChoice(managedGuild: ManagedGuild, member: GuildMember
 
   const choiceHelp = `Here are your options:\n${availableChoices
     .map((choice) => `${choice.value}: ${choice.label}`)
-    .join('\n')}\n\nTo choose one, say something like "!choose ${availableChoices[0].value}".`;
+    .join('\n')}\n\nTo choose one, say something like \`!choose ${availableChoices[0].value}\`.`;
 
   const choiceArg = args;
   if (choiceArg === '') {

@@ -1,8 +1,3 @@
+_A Question of Care_
+
 **Year: 1975**
-
-This year, as for the past four years, the garden party has been shifted from Barbara's birthday to that of her five-year old daughter Stephanie. After William and Barbara divorced, Barbara has struggled as a single mother. William has contributed financially to Stephanie's upbringing, but rarely visits. Since he made partner in the law firm, he hasn't had enough time to help out. Besides, he still finds it hard to see Barbara like this, but he knows that he can't go back.
-
-Charles has remained connected, at least as connected as Charles ever was. He has drifted in and out of Barbara and Stephanie's lives. They have been involved on and off, but he is such a destabilizing influence that Barbara never wanted him to be too present in Stephanie's life. She always felt that letting Charles become a father-figure to Stephanie would be worse than no father. With his flair for the dramatic, he could break her heart almost by accident. She's young and grows attached too easily. How could she handle it if he suddenly disappeared? Still, they reconnect occasionally, and Stephanie is quite fond of him.
-
-Recently, however, a new issue has come up. Barbara's mother, Virginia, has had a stroke, and can no longer manage on her own. Barbara needs to decide whether to care for her in her home or send her to a nursing home. Without additional help, she probably can't afford the cost of a nursing home. However, Barbara is very busy chasing after Stephanie, and the extra work of caring for an ailing parent would be difficult. She has been considering going back to college to become a teacher once Stephanie is in school, and caring for Virginia might make that impossible. At the same time, tuition might make the costs of a nursing home even more prohibitive.
-
