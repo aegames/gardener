@@ -11,6 +11,8 @@ export type GameVariableBase = {
 
 export type Area<VariableType extends GameVariableBase> = {
   name: string;
+  textChannelName: string;
+  voiceChannelName: string;
   variables: Partial<Record<VariableType['id'], VariableType>>;
 };
 
@@ -48,6 +50,8 @@ export type Game<VariableType extends GameVariableBase> = {
   characters: Map<string, Character>;
   characterTypes: Map<string, CharacterType>;
   commandHandlers: Dictionary<CommandHandler<VariableType>>;
+  gmChannelName: string;
+  gmRoleName: string;
   globalVariables: Map<string, VariableType>;
   prePrepScene?: (
     managedGuild: ManagedGuild,

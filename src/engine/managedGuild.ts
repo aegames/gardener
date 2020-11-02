@@ -94,17 +94,18 @@ function loadAreaChannelsForGuild(managedGuild: ManagedGuild, game: Game<any>) {
   const areaVoiceChannels = new Map<string, VoiceChannel>();
 
   const areas = [...game.areas.values()];
-  const areaNames = new Set(areas.map((area) => area.name));
-  const areaNameByTextChannelName = new Map(
-    areas.map((area) => [getAreaTextChannelName(area.name), area.name]),
-  );
 
   managedGuild.guild.channels.cache.forEach((channel) => {
-    const channelName = channel.name;
-    if (channel.type === 'voice' && areaNames.has(channelName)) {
-      areaVoiceChannels.set(channelName, channel as VoiceChannel);
-    } else if (channel.type === 'text' && areaNameByTextChannelName.has(channelName)) {
-      areaTextChannels.set(areaNameByTextChannelName.get(channelName)!, channel as TextChannel);
+    if (channel.type === 'voice') {
+      const area = areas.find((area) => area.voiceChannelName === channel.name);
+      if (area) {
+        areaVoiceChannels.set(area.name, channel as VoiceChannel);
+      }
+    } else if (channel.type === 'text') {
+      const area = areas.find((area) => area.textChannelName === channel.name);
+      if (area) {
+        areaTextChannels.set(area.name, channel as TextChannel);
+      }
     }
   });
   managedGuild.areaTextChannels = areaTextChannels;
@@ -117,7 +118,7 @@ export async function loadRolesForGuild(managedGuild: ManagedGuild, game: Game<a
 
   const roles = await managedGuild.guild.roles.fetch();
   roles.cache.forEach((role) => {
-    if (role.name === 'GM') {
+    if (role.name === game.gmRoleName) {
       gmRole = role;
     } else if (game.characters.has(role.name)) {
       characterRoles.set(role.name, role);

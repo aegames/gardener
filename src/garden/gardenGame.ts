@@ -27,6 +27,8 @@ export const gardenGame: Game<GardenVariable> = {
     choose,
   },
   globalVariables: new Map(),
+  gmChannelName: 'gmcentral',
+  gmRoleName: 'GM',
   prePrepScene: prePrepGardenScene,
   postPrepScene: postPrepGardenScene,
   sceneNames: scenes.map((scene) => scene.name),
