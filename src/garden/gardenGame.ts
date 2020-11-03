@@ -8,14 +8,14 @@ import {
   innerCharacters,
   innerCharacterType,
 } from './characters';
-import { scenes } from './scenes';
+import { GardenScene, scenes } from './scenes';
 import { GardenVariable, GardenVariableId } from './variables';
 import { postPrepGardenScene } from './postPrep';
-import { choose } from './commands';
+import { choose, collapse, setChoice } from './commands';
 import { prePrepGardenScene } from './prePrep';
 import { commonCommandHandlers } from '../engine/commandHandlers';
 
-export const gardenGame: Game<GardenVariable> = {
+export const gardenGame: Game<GardenVariable, GardenArea, GardenScene> = {
   areas: new Map(Object.entries(areas)),
   characterTypes: new Map([
     ['frame', frameCharacterType],
@@ -25,6 +25,8 @@ export const gardenGame: Game<GardenVariable> = {
   commandHandlers: {
     ...commonCommandHandlers,
     choose,
+    collapse,
+    setchoice: setChoice,
   },
   globalVariables: new Map(),
   gmChannelName: 'gmcentral',
@@ -33,6 +35,7 @@ export const gardenGame: Game<GardenVariable> = {
   postPrepScene: postPrepGardenScene,
   sceneNames: scenes.map((scene) => scene.name),
   scenes,
+  title: 'A Garden of Forking Paths',
 };
 
 export async function getGardenVar(

@@ -1,5 +1,5 @@
 import { Pool, QueryConfig, QueryResult, QueryResultRow } from 'pg';
-import { Game, GameVariableBase, Scene } from './game';
+import { Area, Game, GameVariableBase, Scene } from './game';
 import { ResolvedVariable } from './gameLogic';
 import logger from './logger';
 import { ManagedGuild } from './managedGuild';
@@ -85,10 +85,11 @@ export function setGameVariableValue<VariableType extends GameVariableBase>(
   return setQualifiedVariableValue(managedGuild, getQualifiedVariableId(variable), value);
 }
 
-export async function getGameScene<VariableType extends GameVariableBase>(
-  managedGuild: ManagedGuild,
-  game: Game<VariableType>,
-) {
+export async function getGameScene<
+  VariableType extends GameVariableBase,
+  AreaType extends Area<VariableType>,
+  SceneType extends Scene<VariableType, AreaType>
+>(managedGuild: ManagedGuild, game: Game<VariableType, AreaType, SceneType>) {
   const result = await dbPool.query('SELECT scene_name FROM game_states WHERE guild_id = $1', [
     managedGuild.guild.id,
   ]);
@@ -105,7 +106,7 @@ export async function getGameScene<VariableType extends GameVariableBase>(
   return game.scenes.find((scene) => scene.name === sceneName);
 }
 
-export function setGameScene(managedGuild: ManagedGuild, scene?: Scene<any>) {
+export function setGameScene(managedGuild: ManagedGuild, scene?: Scene<any, any>) {
   return query(
     `INSERT INTO game_states (guild_id, scene_name)
     VALUES ($1, $2)

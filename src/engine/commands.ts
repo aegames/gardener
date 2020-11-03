@@ -1,6 +1,6 @@
 import { GuildChannel, GuildMember, OverwriteResolvable, Role, TextChannel } from 'discord.js';
 import { flatMap, flatten } from 'lodash';
-import { getGameScene, setGameScene } from './database';
+import { setGameScene } from './database';
 import { Area, AreaSetup, Game, GameVariableBase, Scene } from './game';
 import { loadRolesForGuild, ManagedGuild } from './managedGuild';
 import { notEmpty } from '../utils';
@@ -14,11 +14,15 @@ export type PlacementResult = {
   voiceChannelJoinError?: Error;
 };
 
-async function placeCharacter<VariableType extends GameVariableBase>(
+async function placeCharacter<
+  VariableType extends GameVariableBase,
+  AreaType extends Area<VariableType>,
+  SceneType extends Scene<VariableType, AreaType>
+>(
   voiceChannel: GuildChannel,
   primaryRole: Role,
   secondaryRole: Role | undefined,
-  game: Game<VariableType>,
+  game: Game<VariableType, AreaType, SceneType>,
 ): Promise<PlacementResult[]> {
   if (primaryRole.members.size === 0) {
     logger.verbose(`No player for ${primaryRole.name}`);
@@ -52,7 +56,11 @@ async function placeCharacter<VariableType extends GameVariableBase>(
       ...rolesToRemove.map((role) => member.roles.remove(role)),
     ]);
 
-    const result: PrepSceneResults<VariableType>['areaSetupResults'][0]['placementResults'][0] = {
+    const result: PrepSceneResults<
+      VariableType,
+      AreaType,
+      SceneType
+    >['areaSetupResults'][0]['placementResults'][0] = {
       member,
       nicknameChanged: false,
       nicknameChangeError: undefined,
@@ -99,7 +107,15 @@ async function lockArea(managedGuild: ManagedGuild, area: Area<any>) {
   ]);
 }
 
-async function setupArea(managedGuild: ManagedGuild, game: Game<any>, areaSetup: AreaSetup<any>) {
+async function setupArea<
+  VariableType extends GameVariableBase,
+  AreaType extends Area<VariableType>,
+  SceneType extends Scene<VariableType, AreaType>
+>(
+  managedGuild: ManagedGuild,
+  game: Game<VariableType, AreaType, SceneType>,
+  areaSetup: AreaSetup<VariableType, AreaType>,
+) {
   const voiceChannel = managedGuild.areaVoiceChannels.get(areaSetup.area.name);
   const textChannel = managedGuild.areaTextChannels.get(areaSetup.area.name);
   if (!voiceChannel || !textChannel) {
@@ -150,10 +166,14 @@ async function setupArea(managedGuild: ManagedGuild, game: Game<any>, areaSetup:
   return { area: areaSetup.area, placementResults: flatten(placementResults) };
 }
 
-export type PrepSceneResults<VariableType extends GameVariableBase> = {
-  scene: Scene<VariableType>;
+export type PrepSceneResults<
+  VariableType extends GameVariableBase,
+  AreaType extends Area<VariableType>,
+  SceneType extends Scene<VariableType, AreaType>
+> = {
+  scene: SceneType;
   areaSetupResults: {
-    area: Area<VariableType>;
+    area: AreaType;
     placementResults: PlacementResult[];
   }[];
 };
@@ -170,11 +190,15 @@ export async function sendFiles(channel: TextChannel, files: string[]) {
   return await channel.send({ files });
 }
 
-export async function prepScene<VariableType extends GameVariableBase>(
+export async function prepScene<
+  VariableType extends GameVariableBase,
+  AreaType extends Area<VariableType>,
+  SceneType extends Scene<VariableType, AreaType>
+>(
   managedGuild: ManagedGuild,
-  game: Game<VariableType>,
-  scene: Scene<VariableType>,
-): Promise<PrepSceneResults<VariableType>> {
+  game: Game<VariableType, AreaType, SceneType>,
+  scene: SceneType,
+): Promise<PrepSceneResults<VariableType, AreaType, SceneType>> {
   const areaSetups = scene.areaSetups ?? [];
   const activeAreas = areaSetups.map((areaSetup) => areaSetup.area);
   const areaNames = new Set(activeAreas.map((area) => area.name));
@@ -211,28 +235,13 @@ export async function prepScene<VariableType extends GameVariableBase>(
   return { scene, areaSetupResults };
 }
 
-export async function prepNextScene(managedGuild: ManagedGuild, game: Game<any>) {
-  const currentScene = await getGameScene(managedGuild, game);
-  if (currentScene == null) {
-    throw new Error('There is no active scene right now.');
-  }
-
-  const nextScene =
-    game.scenes[game.scenes.findIndex((scene) => scene.name === currentScene.name) + 1];
-  if (nextScene == null) {
-    throw new Error('This is the last scene in the game.');
-  }
-
-  return await prepScene(managedGuild, game, nextScene);
-}
-
-export function getMemberCharacters(member: GuildMember, game: Game<any>) {
+export function getMemberCharacters(member: GuildMember, game: Game<any, any, any>) {
   return member.roles.cache
     .array()
     .map((role) => game.characters.get(role.name))
     .filter(notEmpty);
 }
 
-export function getPrimaryCharacter(member: GuildMember, game: Game<any>) {
+export function getPrimaryCharacter(member: GuildMember, game: Game<any, any, any>) {
   return getMemberCharacters(member, game).find((character) => character.type.primary);
 }

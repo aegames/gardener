@@ -17,8 +17,11 @@ export type ResolvedVariable<VariableType extends GameVariableBase> = {
   variable: VariableType;
 };
 
-export function resolveVariable<VariableType extends GameVariableBase>(
-  game: Game<VariableType>,
+export function resolveVariable<
+  VariableType extends GameVariableBase,
+  AreaType extends Area<VariableType>
+>(
+  game: Game<VariableType, AreaType, any>,
   ref: VariableReference<VariableType>,
   context: ResolutionContext<VariableType>,
 ): ResolvedVariable<VariableType> | undefined {
@@ -50,7 +53,7 @@ export function resolveVariable<VariableType extends GameVariableBase>(
 
 export async function getVariableValues<VariableType extends GameVariableBase>(
   managedGuild: ManagedGuild,
-  game: Game<VariableType>,
+  game: Game<VariableType, any, any>,
   context: ResolutionContext<VariableType>,
   ...refs: VariableReference<VariableType>[]
 ) {
@@ -67,7 +70,7 @@ export async function getVariableValues<VariableType extends GameVariableBase>(
 
 export async function getVariableValue<VariableType extends GameVariableBase>(
   managedGuild: ManagedGuild,
-  game: Game<VariableType>,
+  game: Game<VariableType, any, any>,
   context: ResolutionContext<VariableType>,
   ref: VariableReference<VariableType>,
 ) {
@@ -76,7 +79,7 @@ export async function getVariableValue<VariableType extends GameVariableBase>(
 
 export async function setVariableValue<VariableType extends GameVariableBase>(
   managedGuild: ManagedGuild,
-  game: Game<VariableType>,
+  game: Game<VariableType, any, any>,
   context: ResolutionContext<VariableType>,
   ref: VariableReference<VariableType>,
   value: any,

@@ -1,11 +1,31 @@
 import { Area } from '../engine/game';
 import { buildTimelineVariables, GardenVariable } from './variables';
 
-export type GardenAreaName = 'The Funeral Home' | 'Area 1' | 'Area 2' | 'Area 3';
+export const innerAreaNames = ['Area 1', 'Area 2', 'Area 3'] as const;
+export const frameAreaNames = ['The Funeral Home'] as const;
+export type InnerGardenAreaName = typeof innerAreaNames[number];
+export type FrameGardenAreaName = typeof frameAreaNames[number];
+export type GardenAreaName = InnerGardenAreaName | FrameGardenAreaName;
 
-export type GardenArea = Area<GardenVariable> & {
-  name: GardenAreaName;
+export type GardenInnerArea = Area<GardenVariable> & {
+  name: InnerGardenAreaName;
+  variables: ReturnType<typeof buildTimelineVariables>;
 };
+
+export type GardenFrameArea = Area<GardenVariable> & {
+  name: FrameGardenAreaName;
+  variables: {};
+};
+
+export type GardenArea = GardenInnerArea | GardenFrameArea;
+
+export function isInnerArea(area: GardenArea): area is GardenInnerArea {
+  return (innerAreaNames as readonly string[]).includes(area.name);
+}
+
+export function isFrameArea(area: GardenArea): area is GardenInnerArea {
+  return (frameAreaNames as readonly string[]).includes(area.name);
+}
 
 export const areas: Record<GardenAreaName, GardenArea> = {
   'The Funeral Home': {

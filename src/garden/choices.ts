@@ -4,39 +4,41 @@ import { getMemberCharacters } from '../engine/commands';
 import { getGameScene } from '../engine/database';
 import { ManagedGuild } from '../engine/managedGuild';
 import { flatMap } from 'lodash';
-import { GardenScene } from './scenes';
-import { GardenArea } from './areas';
+import { GardenInnerScene, GardenScene, isInnerScene } from './scenes';
+import { GardenArea, GardenInnerArea, isInnerArea } from './areas';
 import { gardenGame, getGardenVar, setGardenVar } from './gardenGame';
 import { ChoiceVariable } from './variables';
-import { notEmpty } from '../utils';
+import assertNever from 'assert-never';
 
 export async function getSceneChoices(
   managedGuild: ManagedGuild,
-  scene: GardenScene,
-  area: GardenArea,
+  scene: GardenInnerScene,
+  area: GardenInnerArea,
 ): Promise<ChoiceVariable[]> {
   if (scene.name === 'Act I Scene 1') {
-    return [area.variables.barbaraSpouse].filter(notEmpty);
+    return [area.variables.barbaraSpouse];
   } else if (scene.name === 'Act I Scene 2') {
     const barbaraSpouse = await getGardenVar(managedGuild, area, 'barbaraSpouse');
     if (barbaraSpouse === 'A') {
-      return [area.variables.barbaraCheated, area.variables.spouseCheated].filter(notEmpty);
+      return [area.variables.barbaraCheated, area.variables.spouseCheated];
     } else {
-      return [area.variables.barbaraCheated].filter(notEmpty);
+      return [area.variables.barbaraCheated];
     }
   } else if (scene.name === 'Act I Scene 3') {
-    return [area.variables.divorce].filter(notEmpty);
+    return [area.variables.divorce];
   } else if (scene.name === 'Act I Scene 4') {
-    return [area.variables.virginiaNursingHome].filter(notEmpty);
+    return [area.variables.virginiaNursingHome];
   } else if (scene.name === 'Act II Scene 1') {
-    return [area.variables.brotherLentMoney].filter(notEmpty);
+    return [area.variables.brotherLentMoney];
   } else if (scene.name === 'Act II Scene 2') {
-    return [area.variables.drunkDrivingConsequences].filter(notEmpty);
+    return [area.variables.drunkDrivingConsequences];
   } else if (scene.name === 'Act II Scene 3') {
-    return [area.variables.acceptZach].filter(notEmpty);
+    return [area.variables.acceptZach];
+  } else if (scene.name === 'Act II Scene 4') {
+    return [];
+  } else {
+    assertNever(scene.name);
   }
-
-  return [];
 }
 
 export async function getStateForMember(managedGuild: ManagedGuild, member: GuildMember) {
@@ -59,8 +61,8 @@ export async function getStateForMember(managedGuild: ManagedGuild, member: Guil
 
 export async function getAvailableChoicesForMember(
   managedGuild: ManagedGuild,
-  scene: GardenScene,
-  area: GardenArea,
+  scene: GardenInnerScene,
+  area: GardenInnerArea,
   characters: Character[],
 ) {
   const availableChoiceVariables = await getSceneChoices(managedGuild, scene, area);
@@ -76,6 +78,10 @@ export async function getAvailableChoicesForMember(
 
 export async function makeChoice(managedGuild: ManagedGuild, member: GuildMember, args: string) {
   const { scene, characters, area } = await getStateForMember(managedGuild, member);
+  if (!isInnerScene(scene) || !isInnerArea(area)) {
+    throw new Error("You don't have any choices available right now.");
+  }
+
   const availableChoices = await getAvailableChoicesForMember(
     managedGuild,
     scene,
@@ -101,5 +107,26 @@ export async function makeChoice(managedGuild: ManagedGuild, member: GuildMember
   }
 
   await setGardenVar(managedGuild, area, choice.variable.id, choice.value);
+  return choice;
+}
+
+export async function setAreaChoice(
+  managedGuild: ManagedGuild,
+  area: GardenArea,
+  choiceValue: any,
+) {
+  const choiceVariable = Object.values(area.variables).find(
+    (variable) =>
+      variable?.type === 'choice' &&
+      variable?.choices.find((choice) => choice.value === choiceValue),
+  );
+
+  if (!choiceVariable) {
+    throw new Error(`${choiceValue} is not a valid choice value.`);
+  }
+
+  const choice = choiceVariable.choices.find((choice) => choice.value === choiceValue)!;
+
+  await setGardenVar(managedGuild, area, choiceVariable.id, choiceValue);
   return choice;
 }

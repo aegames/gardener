@@ -1,5 +1,5 @@
 import { AreaSetup, CharacterType, Scene } from '../engine/game';
-import { areas } from './areas';
+import { areas, GardenArea } from './areas';
 import {
   frameCharacters,
   frameCharacterType,
@@ -8,27 +8,45 @@ import {
 } from './characters';
 import { GardenVariable } from './variables';
 
-export type GardenSceneName =
-  | 'Prologue'
-  | 'Act I Scene 1'
-  | 'Act I Scene 2'
-  | 'Act I Scene 3'
-  | 'Act I Scene 4'
-  | 'Intermission'
-  | 'Act II Scene 1'
-  | 'Act II Scene 2'
-  | 'Act II Scene 3'
-  | 'Act II Scene 4'
-  | 'Epilogue';
+export const innerSceneNames = [
+  'Act I Scene 1',
+  'Act I Scene 2',
+  'Act I Scene 3',
+  'Act I Scene 4',
+  'Act II Scene 1',
+  'Act II Scene 2',
+  'Act II Scene 3',
+  'Act II Scene 4',
+] as const;
 
-export type GardenScene = Scene<GardenVariable> & {
-  name: GardenSceneName;
+export const frameSceneNames = ['Prologue', 'Intermission', 'Epilogue'] as const;
+
+export type GardenInnerSceneName = typeof innerSceneNames[number];
+export type GardenFrameSceneName = typeof frameSceneNames[number];
+export type GardenSceneName = GardenInnerSceneName | GardenFrameSceneName;
+
+export type GardenInnerScene = Scene<GardenVariable, GardenArea> & {
+  name: GardenInnerSceneName;
 };
+
+export type GardenFrameScene = Scene<GardenVariable, GardenArea> & {
+  name: GardenFrameSceneName;
+};
+
+export type GardenScene = GardenInnerScene | GardenFrameScene;
+
+export function isInnerScene(scene: GardenScene): scene is GardenInnerScene {
+  return (innerSceneNames as readonly string[]).includes(scene.name);
+}
+
+export function isFrameScene(scene: GardenScene): scene is GardenInnerScene {
+  return (frameSceneNames as readonly string[]).includes(scene.name);
+}
 
 function buildScene(
   name: GardenSceneName,
   characterType: CharacterType,
-  areaSetups: Omit<AreaSetup<GardenVariable>, 'scene'>[],
+  areaSetups: Omit<AreaSetup<GardenVariable, GardenArea>, 'scene'>[],
 ): GardenScene {
   const scene: GardenScene = {
     name,

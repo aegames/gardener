@@ -32,7 +32,7 @@ export function getAreaVoiceChannel(managedGuild: ManagedGuild, areaName: string
 
 export function checkReadyToPlay(
   managedGuild: ManagedGuild,
-  game: Game<any>,
+  game: Game<any, any, any>,
 ): { readyToPlay: true; errorMessage: undefined } | { readyToPlay: false; errorMessage: string } {
   const { guild } = managedGuild;
   const areaNames = [...game.areas.values()].map((area) => area.name);
@@ -78,7 +78,7 @@ export function checkReadyToPlay(
 
 async function checkReadyToPlayAndReportInSystemChannel(
   managedGuild: ManagedGuild,
-  game: Game<any>,
+  game: Game<any, any, any>,
 ) {
   const previouslyReady = managedGuild.readyToPlay;
   const result = checkReadyToPlay(managedGuild, game);
@@ -89,7 +89,7 @@ async function checkReadyToPlayAndReportInSystemChannel(
   }
 }
 
-function loadAreaChannelsForGuild(managedGuild: ManagedGuild, game: Game<any>) {
+function loadAreaChannelsForGuild(managedGuild: ManagedGuild, game: Game<any, any, any>) {
   const areaTextChannels = new Map<string, TextChannel>();
   const areaVoiceChannels = new Map<string, VoiceChannel>();
 
@@ -112,7 +112,7 @@ function loadAreaChannelsForGuild(managedGuild: ManagedGuild, game: Game<any>) {
   managedGuild.areaVoiceChannels = areaVoiceChannels;
 }
 
-export async function loadRolesForGuild(managedGuild: ManagedGuild, game: Game<any>) {
+export async function loadRolesForGuild(managedGuild: ManagedGuild, game: Game<any, any, any>) {
   const characterRoles = new Map<string, Role>();
   let gmRole: Role | undefined;
 
@@ -133,7 +133,7 @@ function channelIsGuildChannel(channel: Channel): channel is GuildChannel {
   return 'guild' in channel;
 }
 
-function maybeLoadGuildChannels(channel: Channel, game: Game<any>) {
+function maybeLoadGuildChannels(channel: Channel, game: Game<any, any, any>) {
   if (channelIsGuildChannel(channel)) {
     const managedGuild = managedGuildsByGuildId.get(channel.guild.id);
     if (managedGuild) {
@@ -143,7 +143,7 @@ function maybeLoadGuildChannels(channel: Channel, game: Game<any>) {
   }
 }
 
-async function maybeLoadGuildRoles(role: Role, game: Game<any>) {
+async function maybeLoadGuildRoles(role: Role, game: Game<any, any, any>) {
   const managedGuild = managedGuildsByGuildId.get(role.guild.id);
   if (managedGuild) {
     await loadRolesForGuild(managedGuild, game);
@@ -151,7 +151,7 @@ async function maybeLoadGuildRoles(role: Role, game: Game<any>) {
   }
 }
 
-export function setupClient(game: Game<any>) {
+export function setupClient(game: Game<any, any, any>) {
   const client = new Client();
 
   const channelChanged = (channel: Channel) => maybeLoadGuildChannels(channel, game);
@@ -198,7 +198,7 @@ export function setupClient(game: Game<any>) {
   return client;
 }
 
-export async function bringGuildUnderManagement(guild: Guild, game: Game<any>) {
+export async function bringGuildUnderManagement(guild: Guild, game: Game<any, any, any>) {
   const managedGuild: ManagedGuild = {
     guild,
     areaTextChannels: new Map<string, TextChannel>(),

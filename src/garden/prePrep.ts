@@ -1,23 +1,44 @@
-import logger from '../engine/logger';
 import { ManagedGuild } from '../engine/managedGuild';
 import { GardenArea } from './areas';
-import { getGardenVars } from './gardenGame';
-import { GardenScene } from './scenes';
+import { GardenInnerScene, GardenScene, isInnerScene } from './scenes';
+import {
+  buildVariant,
+  existingVariants,
+  getEffectiveVariableValues,
+  getVariantVariableIdsForScene,
+} from './timelineVariants';
 import { GardenVariableId } from './variables';
 
 async function assertVariablesSet(
   managedGuild: ManagedGuild,
   area: GardenArea,
-  ...variableIds: GardenVariableId[]
+  ...variableIds: ['barbaraSpouse', ...GardenVariableId[]]
 ) {
-  const variableValues = await getGardenVars(managedGuild, area, ...variableIds);
+  const variableValues = await getEffectiveVariableValues(managedGuild, area, variableIds);
   const missingVariableIds = variableIds.filter(
     (variableId, index) => variableValues[index] == null,
   );
   if (missingVariableIds.length > 0) {
-    throw new Error(`${area.name} has no value for ${missingVariableIds.join(', ')}`);
+    const missingVariableDescriptions = missingVariableIds.map((variableId) => {
+      const variable = area.variables[variableId];
+      if (variable?.type === 'choice') {
+        return `${variableId} [${variable.choices
+          .map((choice) => `${choice.value}: ${choice.label}`)
+          .join(', ')}]`;
+      } else {
+        return variableId;
+      }
+    });
+    throw new Error(`${area.name} has no value for ${missingVariableDescriptions.join(', ')}`);
   }
   return variableValues;
+}
+
+function assertVariantExists(scene: GardenInnerScene, variant: string) {
+  const existingVariantsForScene = existingVariants[scene.name];
+  if (!existingVariantsForScene.includes(variant)) {
+    throw new Error(`${scene.name} has no variant for ${variant}.  Try using \`!collapse\`.`);
+  }
 }
 
 export async function prePrepGardenScene(
@@ -25,61 +46,12 @@ export async function prePrepGardenScene(
   scene: GardenScene,
   area: GardenArea,
 ) {
-  if (scene.name === 'Act I Scene 2') {
-    await assertVariablesSet(managedGuild, area, 'barbaraSpouse');
-  } else if (scene.name === 'Act I Scene 3') {
-    const [barbaraSpouse] = await assertVariablesSet(
-      managedGuild,
-      area,
-      'barbaraSpouse',
-      'barbaraCheated',
-    );
-    if (barbaraSpouse === 'A') {
-      await assertVariablesSet(managedGuild, area, 'spouseCheated');
+  if (isInnerScene(scene)) {
+    const variantVariableIds = await getVariantVariableIdsForScene(managedGuild, scene, area);
+    if (variantVariableIds) {
+      await assertVariablesSet(managedGuild, area, ...variantVariableIds);
+      const variant = await buildVariant(managedGuild, area, variantVariableIds);
+      assertVariantExists(scene, variant);
     }
-  } else if (scene.name === 'Act I Scene 4') {
-    await assertVariablesSet(managedGuild, area, 'barbaraSpouse', 'divorce');
-  } else if (scene.name === 'Act II Scene 1') {
-    await assertVariablesSet(
-      managedGuild,
-      area,
-      'barbaraSpouse',
-      'barbaraCheated',
-      'divorce',
-      'virginiaNursingHome',
-    );
-  } else if (scene.name === 'Act II Scene 2') {
-    await assertVariablesSet(
-      managedGuild,
-      area,
-      'barbaraSpouse',
-      'barbaraCheated',
-      'divorce',
-      'virginiaNursingHome',
-      'brotherLentMoney',
-    );
-  } else if (scene.name === 'Act II Scene 3') {
-    await assertVariablesSet(
-      managedGuild,
-      area,
-      'barbaraSpouse',
-      'barbaraCheated',
-      'divorce',
-      'virginiaNursingHome',
-      'brotherLentMoney',
-      'drunkDrivingConsequences',
-    );
-  } else if (scene.name === 'Act II Scene 4') {
-    await assertVariablesSet(
-      managedGuild,
-      area,
-      'barbaraSpouse',
-      'barbaraCheated',
-      'divorce',
-      'virginiaNursingHome',
-      'brotherLentMoney',
-      'drunkDrivingConsequences',
-      'acceptZach',
-    );
   }
 }

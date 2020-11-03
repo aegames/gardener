@@ -1,7 +1,7 @@
 import { GuildMember, Message } from 'discord.js';
 import { flatMap } from 'lodash';
-import { prepNextScene, prepScene, PrepSceneResults } from './commands';
-import { Game, GameVariableBase } from './game';
+import { prepScene, PrepSceneResults } from './commands';
+import { Area, Game, GameVariableBase, Scene } from './game';
 import { checkReadyToPlay, ManagedGuild } from './managedGuild';
 import { notEmpty } from '../utils';
 import logger from './logger';
@@ -13,10 +13,15 @@ import {
   setQualifiedVariableValue,
 } from './database';
 import { resolveVariable } from './gameLogic';
+import { findScene } from './sceneHelpers';
 
-export type CommandHandler<VariableType extends GameVariableBase> = (
+export type CommandHandler<
+  VariableType extends GameVariableBase,
+  AreaType extends Area<VariableType>,
+  SceneType extends Scene<VariableType, AreaType>
+> = (
   managedGuild: ManagedGuild,
-  game: Game<VariableType>,
+  game: Game<VariableType, AreaType, SceneType>,
   msg: Message,
   args: string,
 ) => Promise<any>;
@@ -32,7 +37,7 @@ export function assertHasGMRole(managedGuild: ManagedGuild, member: GuildMember 
   }
 }
 
-const helpHandler: CommandHandler<any> = async (managedGuild, game, msg) => {
+const helpHandler: CommandHandler<any, any, any> = async (managedGuild, game, msg) => {
   await msg.reply(
     `Available commands:\n${Object.keys(game.commandHandlers)
       .sort()
@@ -41,9 +46,7 @@ const helpHandler: CommandHandler<any> = async (managedGuild, game, msg) => {
   );
 };
 
-function formatPrepSceneResults<VariableType extends GameVariableBase>(
-  results: PrepSceneResults<VariableType>,
-) {
+function formatPrepSceneResults(results: PrepSceneResults<any, any, any>) {
   const warnings: string[] = flatMap(results.areaSetupResults, (areaSetupResults) =>
     flatMap(areaSetupResults.placementResults, (placementResult) => [
       placementResult.voiceChannelJoined
@@ -62,37 +65,20 @@ function formatPrepSceneResults<VariableType extends GameVariableBase>(
   }
 }
 
-async function replyWithPrepSceneResults(msg: Message, results: PrepSceneResults<any>) {
+async function replyWithPrepSceneResults(msg: Message, results: PrepSceneResults<any, any, any>) {
   const reply = `Prepped ${results.scene.name}${formatPrepSceneResults(results)}`;
   reply.split('\n').forEach((line) => logger.info(line));
   return await msg.reply(reply);
 }
 
-const prep: CommandHandler<any> = async (managedGuild, game, msg, args) => {
+const prep: CommandHandler<any, any, any> = async (managedGuild, game, msg, args) => {
   assertHasGMRole(managedGuild, msg.member);
-
-  if (args === 'next') {
-    const results = await prepNextScene(managedGuild, game);
-    await replyWithPrepSceneResults(msg, results);
-  } else if (args === 'first') {
-    const results = await prepScene(managedGuild, game, game.scenes[0]);
-    await replyWithPrepSceneResults(msg, results);
-  } else {
-    const scene = game.scenes.find((scene) => scene.name === args);
-    if (scene) {
-      const results = await prepScene(managedGuild, game, scene);
-      await replyWithPrepSceneResults(msg, results);
-    } else {
-      msg.reply(
-        `Invalid command.  To prep a scene, you can say:\n!prep next (for the next scene)\n${game.scenes
-          .map((scene) => `!prep ${scene.name}`)
-          .join('\n')}`,
-      );
-    }
-  }
+  const scene = await findScene(managedGuild, game, args);
+  const results = await prepScene(managedGuild, game, scene);
+  await replyWithPrepSceneResults(msg, results);
 };
 
-const getHandler: CommandHandler<any> = async (managedGuild, game, msg, args) => {
+const getHandler: CommandHandler<any, any, any> = async (managedGuild, game, msg, args) => {
   assertHasGMRole(managedGuild, msg.member);
 
   if (args !== '') {
@@ -122,7 +108,7 @@ const getHandler: CommandHandler<any> = async (managedGuild, game, msg, args) =>
   }
 };
 
-const setHandler: CommandHandler<any> = async (managedGuild, game, msg, args) => {
+const setHandler: CommandHandler<any, any, any> = async (managedGuild, game, msg, args) => {
   assertHasGMRole(managedGuild, msg.member);
 
   const [variableId, ...rest] = args.split(' ');
@@ -140,7 +126,7 @@ const setHandler: CommandHandler<any> = async (managedGuild, game, msg, args) =>
   msg.reply(`Set ${variableId} to ${JSON.stringify(value)}`);
 };
 
-const resetgame: CommandHandler<any> = async (managedGuild, game, msg, args) => {
+const resetgame: CommandHandler<any, any, any> = async (managedGuild, game, msg, args) => {
   assertHasGMRole(managedGuild, msg.member);
 
   if (args === 'confirm') {
@@ -159,9 +145,13 @@ export const commonCommandHandlers = {
   resetgame,
 };
 
-export async function handleCommand(
+export async function handleCommand<
+  VariableType extends GameVariableBase,
+  AreaType extends Area<VariableType>,
+  SceneType extends Scene<VariableType, AreaType>
+>(
   managedGuild: ManagedGuild,
-  game: Game<any>,
+  game: Game<VariableType, AreaType, SceneType>,
   msg: Message,
   command: string,
   args: string,
