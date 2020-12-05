@@ -39,7 +39,7 @@ export function isInnerScene(scene: GardenScene): scene is GardenInnerScene {
   return (innerSceneNames as readonly string[]).includes(scene.name);
 }
 
-export function isFrameScene(scene: GardenScene): scene is GardenInnerScene {
+export function isFrameScene(scene: GardenScene): scene is GardenFrameScene {
   return (frameSceneNames as readonly string[]).includes(scene.name);
 }
 
@@ -58,8 +58,9 @@ function buildScene(
     scene,
     placements: areaSetup.placements.map((placement) => ({
       ...placement,
-      secondaryCharacter:
-        placement.secondaryCharacter ?? placement.primaryCharacter.defaultSecondaryCharacter,
+      secondaryCharacter: characterType.primary
+        ? undefined
+        : placement.secondaryCharacter ?? placement.primaryCharacter.defaultSecondaryCharacter,
     })),
   }));
   return scene;

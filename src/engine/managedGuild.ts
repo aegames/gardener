@@ -18,12 +18,8 @@ function findMissing<T>(expected: T[], actual: Map<T, any>) {
   return expected.filter((item) => !actual.has(item));
 }
 
-function getAreaTextChannelName(areaName: string) {
-  return areaName.toLowerCase().replace(/\W+/g, '-');
-}
-
 export function getAreaTextChannel(managedGuild: ManagedGuild, areaName: string) {
-  return managedGuild.areaTextChannels.get(getAreaTextChannelName(areaName));
+  return managedGuild.areaTextChannels.get(areaName);
 }
 
 export function getAreaVoiceChannel(managedGuild: ManagedGuild, areaName: string) {

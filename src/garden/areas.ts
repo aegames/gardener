@@ -23,7 +23,7 @@ export function isInnerArea(area: GardenArea): area is GardenInnerArea {
   return (innerAreaNames as readonly string[]).includes(area.name);
 }
 
-export function isFrameArea(area: GardenArea): area is GardenInnerArea {
+export function isFrameArea(area: GardenArea): area is GardenFrameArea {
   return (frameAreaNames as readonly string[]).includes(area.name);
 }
 

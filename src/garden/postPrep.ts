@@ -3,7 +3,7 @@ import { GardenInnerScene, GardenScene, isFrameScene, isInnerScene } from './sce
 import path from 'path';
 import fs from 'fs';
 import { MessageAttachment, MessageEmbed, TextChannel } from 'discord.js';
-import { ManagedGuild } from '../engine/managedGuild';
+import { getAreaTextChannel, ManagedGuild } from '../engine/managedGuild';
 import { gardenGame } from './gardenGame';
 import { ChoiceVariable, GardenVariableId } from './variables';
 import { getSceneChoices } from './choices';
@@ -140,6 +140,16 @@ async function sendInnerSceneMaterialsWithVariant(
     variant ? `${scene.name} (${variant})` : scene.name,
     getCharacterNamesForInnerScene(scene),
   );
+
+  if (scene.name === 'Act II Scene 4') {
+    await channel.send(
+      'Because this is the last scene, there are no formal choices in this scene.  Your characters can choose anything they want.',
+    );
+  } else {
+    await channel.send(
+      'To make a choice, say `!choose` followed by the letter of the choice you want to make.  For example, to choose option X, say `!choose X`.',
+    );
+  }
 }
 
 export async function postPrepGardenScene(
@@ -150,6 +160,16 @@ export async function postPrepGardenScene(
   if (isInnerScene(scene) && isInnerArea(area)) {
     await sendInnerSceneMaterialsWithVariant(managedGuild, scene, area);
   } else if (isFrameScene(scene) && isFrameArea(area)) {
-    // TODO
+    const miloMembers = (await managedGuild.guild.members.fetch()).filter((member) =>
+      member.roles.cache.some((role) => role.name === 'Milo'),
+    );
+    const instructions = fs.readFileSync(
+      path.join(assetsDir, 'milo-instructions', `${scene.name}.md`),
+      'utf-8',
+    );
+    await Promise.all(miloMembers.map((milo) => milo.send(instructions)));
+    await getAreaTextChannel(managedGuild, area.name)?.send(
+      "We've sent Milo some instructions.  Please give him a moment to read them, and he'll start the scene when he's ready.",
+    );
   }
 }
