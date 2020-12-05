@@ -1,2 +1,5 @@
 /.env
+/dist
+/yarn-error.log
 /node_modules
+/Dockerfile

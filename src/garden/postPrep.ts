@@ -4,17 +4,22 @@ import path from 'path';
 import fs from 'fs';
 import { MessageAttachment, MessageEmbed, TextChannel } from 'discord.js';
 import { ManagedGuild } from '../engine/managedGuild';
-import { gardenGame, getGardenVars } from './gardenGame';
+import { gardenGame } from './gardenGame';
 import { ChoiceVariable, GardenVariableId } from './variables';
 import { getSceneChoices } from './choices';
 import { flatMap, flatten } from 'lodash';
 import { buildVariantForScene, getEffectiveVariableValues } from './timelineVariants';
 import assertNever from 'assert-never';
 
+const assetsDir = path.resolve(process.cwd(), 'assets', 'garden');
+if (!fs.existsSync(assetsDir)) {
+  throw new Error(`Assets path ${assetsDir} not found`);
+}
+
 function getInnerCharacterSheetFilenames(sceneFilenamePortion: string, characterNames: string[]) {
   return characterNames.map((characterName) =>
     path.join(
-      __dirname,
+      assetsDir,
       'inner-character-packets',
       characterName,
       `${characterName} - ${sceneFilenamePortion}.pdf`,
@@ -47,7 +52,7 @@ async function sendInnerSceneMaterials(
   characterNames: string[],
 ) {
   const sceneIntro = fs.readFileSync(
-    path.join(__dirname, 'scene-intros', `${sceneFilenamePortion}.md`),
+    path.join(assetsDir, 'scene-intros', `${sceneFilenamePortion}.md`),
     'utf-8',
   );
   const sceneIndex = gardenGame.scenes.findIndex((otherScene) => otherScene.name === scene.name);
