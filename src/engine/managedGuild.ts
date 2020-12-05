@@ -1,6 +1,6 @@
 import { Channel, Client, Guild, GuildChannel, Role, TextChannel, VoiceChannel } from 'discord.js';
 import { handleCommand } from './commandHandlers';
-import { Game } from './game';
+import { Area, Game } from './game';
 import logger from './logger';
 
 export type ManagedGuild = {
@@ -30,10 +30,13 @@ export function getAreaVoiceChannel(managedGuild: ManagedGuild, areaName: string
   return managedGuild.areaVoiceChannels.get(areaName);
 }
 
-export function checkReadyToPlay(
+export async function checkReadyToPlay(
   managedGuild: ManagedGuild,
-  game: Game<any, any, any>,
-): { readyToPlay: true; errorMessage: undefined } | { readyToPlay: false; errorMessage: string } {
+  game: Game<any, Area<any>, any>,
+  attemptFix: boolean,
+): Promise<
+  { readyToPlay: true; errorMessage: undefined } | { readyToPlay: false; errorMessage: string }
+> {
   const { guild } = managedGuild;
   const areaNames = [...game.areas.values()].map((area) => area.name);
   const missingAreaTextChannels = findMissing(
@@ -49,23 +52,68 @@ export function checkReadyToPlay(
     managedGuild.characterRoles ?? new Map<string, Role>(),
   );
 
-  let errors: string[] = [];
-  if (missingAreaTextChannels.length > 0) {
-    errors.push(`Missing text channels for ${missingAreaTextChannels.join(', ')}!`);
-  }
-  if (missingAreaVoiceChannels.length > 0) {
-    errors.push(`Missing voice channels for ${missingAreaVoiceChannels.join(', ')}!`);
-  }
-  if (missingRoles.length > 0) {
-    errors.push(`Missing roles for ${missingRoles.join(', ')}!`);
-  }
-  if (!managedGuild.gmRole) {
-    errors.push('Missing GM role');
+  const errors: string[] = [];
+
+  if (attemptFix) {
+    const fixResults = await Promise.allSettled([
+      ...missingAreaTextChannels.map((channelName) =>
+        managedGuild.guild.channels.create(channelName, {
+          type: 'text',
+          permissionOverwrites: [{ id: managedGuild.guild.id, deny: ['VIEW_CHANNEL'] }],
+        }),
+      ),
+      ...missingAreaVoiceChannels.map((channelName) =>
+        managedGuild.guild.channels.create(channelName, {
+          type: 'voice',
+          permissionOverwrites: [{ id: managedGuild.guild.id, deny: ['VIEW_CHANNEL'] }],
+        }),
+      ),
+      ...missingRoles.map((roleName) =>
+        managedGuild.guild.roles.create({ data: { name: roleName } }),
+      ),
+      ...(managedGuild.gmRole
+        ? []
+        : [
+            managedGuild.guild.roles.create({
+              data: { name: game.gmRoleName, permissions: ['ADMINISTRATOR'] },
+            }),
+          ]),
+    ]);
+    fixResults.forEach((result) => {
+      if (result.status === 'rejected') {
+        errors.push(result.reason);
+      }
+    });
+  } else {
+    if (missingAreaTextChannels.length > 0) {
+      errors.push(`Missing text channels for ${missingAreaTextChannels.join(', ')}!`);
+    }
+    if (missingAreaVoiceChannels.length > 0) {
+      errors.push(`Missing voice channels for ${missingAreaVoiceChannels.join(', ')}!`);
+    }
+    if (missingRoles.length > 0) {
+      errors.push(`Missing roles for ${missingRoles.join(', ')}!`);
+    }
+    if (!managedGuild.gmRole) {
+      errors.push('Missing GM role');
+    }
   }
 
   if (errors.length > 0) {
-    const errorMessage = [...errors, "Can't start game until these errors are fixed."].join('\n');
+    const errorMessage = [...errors].join('\n');
     managedGuild.readyToPlay = false;
+    if (attemptFix) {
+      const recheckResult = await checkReadyToPlay(managedGuild, game, false);
+      if (recheckResult.readyToPlay) {
+        return recheckResult;
+      } else {
+        return {
+          readyToPlay: false,
+          errorMessage: errorMessage + "\nCan't start game until these errors are fixed.",
+        };
+      }
+    }
+
     return { readyToPlay: false, errorMessage };
   } else {
     if (!managedGuild.readyToPlay) {
@@ -81,7 +129,7 @@ async function checkReadyToPlayAndReportInSystemChannel(
   game: Game<any, any, any>,
 ) {
   const previouslyReady = managedGuild.readyToPlay;
-  const result = checkReadyToPlay(managedGuild, game);
+  const result = await checkReadyToPlay(managedGuild, game, true);
   if (!previouslyReady && result.readyToPlay) {
     await managedGuild.guild.systemChannel?.send('Errors corrected!  Ready to play.');
   } else if (!result.readyToPlay) {
@@ -157,10 +205,8 @@ export function setupClient(game: Game<any, any, any>) {
   const channelChanged = (channel: Channel) => maybeLoadGuildChannels(channel, game);
   const roleChanged = (role: Role) => maybeLoadGuildRoles(role, game);
 
-  client.on('channelCreate', channelChanged);
   client.on('channelUpdate', channelChanged);
   client.on('channelDelete', channelChanged);
-  client.on('roleCreate', roleChanged);
   client.on('roleUpdate', roleChanged);
   client.on('roleDelete', roleChanged);
 

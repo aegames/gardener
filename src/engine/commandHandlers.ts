@@ -137,12 +137,22 @@ const resetgame: CommandHandler<any, any, any> = async (managedGuild, game, msg,
   }
 };
 
+const checkServer: CommandHandler<any, any, any> = async (managedGuild, game, msg, args) => {
+  const result = await checkReadyToPlay(managedGuild, game, true);
+  if (result.readyToPlay) {
+    msg.reply('Everything looks good!');
+  } else {
+    msg.reply(result.errorMessage);
+  }
+};
+
 export const commonCommandHandlers = {
   help: helpHandler,
   prep,
   get: getHandler,
   set: setHandler,
   resetgame,
+  checkserver: checkServer,
 };
 
 export async function handleCommand<
@@ -157,7 +167,7 @@ export async function handleCommand<
   args: string,
 ) {
   if (!managedGuild.readyToPlay) {
-    const result = checkReadyToPlay(managedGuild, game);
+    const result = await checkReadyToPlay(managedGuild, game, false);
     if (!result.readyToPlay) {
       msg.reply(result.errorMessage);
       return;

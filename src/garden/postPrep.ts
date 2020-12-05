@@ -5,7 +5,7 @@ import fs from 'fs';
 import { MessageAttachment, MessageEmbed, TextChannel } from 'discord.js';
 import { ManagedGuild } from '../engine/managedGuild';
 import { gardenGame, getGardenVars } from './gardenGame';
-import { ChoiceVariable, GardenVariable, GardenVariableId } from './variables';
+import { ChoiceVariable, GardenVariableId } from './variables';
 import { getSceneChoices } from './choices';
 import { flatMap, flatten } from 'lodash';
 import { buildVariantForScene, getEffectiveVariableValues } from './timelineVariants';
