@@ -1,3 +1,4 @@
+import { GuildMember } from 'discord.js';
 import { Pool, QueryConfig, QueryResult, QueryResultRow } from 'pg';
 import { Area, Game, GameVariableBase, Scene } from './game';
 import { ResolvedVariable } from './gameLogic';
@@ -117,7 +118,32 @@ export function setGameScene(managedGuild: ManagedGuild, scene?: Scene<any, any>
   );
 }
 
+export async function getOriginalMemberNicknames(managedGuild: ManagedGuild) {
+  const result = await query(
+    `SELECT member_id, original_nickname FROM member_nicknames WHERE guild_id = $1`,
+    [managedGuild.guild.id],
+  );
+
+  return result.rows.reduce<Map<string, string>>((nicknames, row) => {
+    nicknames.set(row.member_id, row.original_nickname);
+    return nicknames;
+  }, new Map<string, string>());
+}
+
+export function setOriginalMemberNicknameIfNotExists(
+  managedGuild: ManagedGuild,
+  member: GuildMember,
+) {
+  return query(
+    `INSERT INTO member_nicknames (guild_id, member_id, original_nickname)
+    VALUES ($1, $2)
+    ON CONFLICT DO NOTHING`,
+    [managedGuild.guild.id, member.id, member.nickname],
+  );
+}
+
 export async function deleteGameData(managedGuild: ManagedGuild) {
   await query(`DELETE FROM game_states WHERE guild_id = $1`, [managedGuild.guild.id]);
   await query(`DELETE FROM game_variables WHERE guild_id = $1`, [managedGuild.guild.id]);
+  await query(`DELETE FROM member_nicknames WHERE guild_id = $1`, [managedGuild.guild.id]);
 }

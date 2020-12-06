@@ -68,6 +68,8 @@ async function placeCharacter<
       voiceChannelJoinError: undefined,
     };
 
+    // TODO: record original nickname before setting nickname
+
     try {
       await member.setNickname(
         secondaryRole ? `${secondaryRole.name} (${primaryRole.name})` : primaryRole.name,

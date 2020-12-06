@@ -153,6 +153,7 @@ export const commonCommandHandlers = {
   set: setHandler,
   resetgame,
   checkserver: checkServer,
+  // TODO: derole command
 };
 
 export async function handleCommand<
