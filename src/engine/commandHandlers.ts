@@ -1,5 +1,5 @@
 import { GuildMember, Message } from 'discord.js';
-import { flatMap } from 'lodash';
+import { flatMap, sortBy } from 'lodash';
 import { prepScene, PrepSceneResults } from './commands';
 import { Area, Game, GameVariableBase, Scene } from './game';
 import { checkReadyToPlay, ManagedGuild } from './managedGuild';
@@ -146,6 +146,30 @@ const checkServer: CommandHandler<any, any, any> = async (managedGuild, game, ms
   }
 };
 
+const castlist: CommandHandler<any, any, any> = async (managedGuild, game, msg) => {
+  assertHasGMRole(managedGuild, msg.member);
+
+  const primaryCharacterTypes = [...game.characterTypes.values()].filter(
+    (characterType) => characterType.primary,
+  );
+  const primaryCharacters = flatMap(primaryCharacterTypes, (characterType) =>
+    [...game.characters.values()].filter((character) => character.type === characterType),
+  );
+  const members = [...(await managedGuild.guild.members.fetch()).values()];
+  const result = sortBy(primaryCharacters, (character) => character.name.toLowerCase())
+    .map((character) => {
+      const role = managedGuild.characterRoles.get(character.name);
+      if (role == null) {
+        return `No rule found for ${character.name}`;
+      }
+
+      const characterMembers = members.filter((member) => member.roles.cache.has(role.id));
+      return `**${character.name}:** ${characterMembers?.sort().join(', ') ?? 'nobody'}`;
+    })
+    .join('\n');
+  msg.channel.send(result);
+};
+
 export const commonCommandHandlers = {
   help: helpHandler,
   prep,
@@ -153,6 +177,7 @@ export const commonCommandHandlers = {
   set: setHandler,
   resetgame,
   checkserver: checkServer,
+  castlist,
   // TODO: derole command
 };
 
