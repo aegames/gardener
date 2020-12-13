@@ -127,8 +127,10 @@ export async function setAreaChoice(
     throw new Error(`${choiceValue} is not a valid choice value.`);
   }
 
-  const choice = choiceVariable.choices.find((choice) => choice.value === choiceValue)!;
+  const choice = choiceVariable.choices.find(
+    (choice) => choice.value.toLowerCase() === choiceValue.toLowerCase(),
+  )!;
 
-  await setGardenVar(managedGuild, area, choiceVariable.id, choiceValue);
+  await setGardenVar(managedGuild, area, choiceVariable.id, choice.value);
   return choice;
 }

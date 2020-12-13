@@ -216,16 +216,17 @@ export function setupClient(game: Game<any, any, any>) {
       return;
     }
 
-    const match = msg.content.match(/^\!(\w+)(\s+(.*))?$/);
+    const match = msg.content.match(/^\!(\s*)(\w+)(\s+(.*))?$/);
     if (!match) {
       return;
     }
 
-    const command = match[1].toLowerCase();
-    const args = match[2]?.trim() ?? '';
+    const spaceBetweenPrefixAndCommand = match[1] != null && match[1]?.length > 0;
+    const command = match[2].toLowerCase();
+    const args = match[3]?.trim() ?? '';
 
     logger.info(`>> ${msg.member?.user.tag}: ${msg.content}`);
-    await handleCommand(managedGuild, game, msg, command, args);
+    await handleCommand(managedGuild, game, msg, command, args, spaceBetweenPrefixAndCommand);
   });
 
   client.on('ready', async () => {

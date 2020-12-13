@@ -191,6 +191,7 @@ export async function handleCommand<
   msg: Message,
   command: string,
   args: string,
+  spaceBetweenPrefixAndCommand: boolean,
 ) {
   if (!managedGuild.readyToPlay) {
     const result = await checkReadyToPlay(managedGuild, game, false);
@@ -202,7 +203,10 @@ export async function handleCommand<
 
   const dispatcher = game.commandHandlers[command];
   if (dispatcher == null) {
-    msg.reply(`Unknown command: ${command}.  To see available commands, say \`!help\`.`);
+    // only reply with an error if this really looks like a command attempt
+    if (!spaceBetweenPrefixAndCommand) {
+      msg.reply(`Unknown command: ${command}.  To see available commands, say \`!help\`.`);
+    }
   } else {
     try {
       await dispatcher(managedGuild, game, msg, args);
