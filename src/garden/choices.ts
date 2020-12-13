@@ -101,7 +101,9 @@ export async function makeChoice(managedGuild: ManagedGuild, member: GuildMember
     throw new Error(`Please specify a choice.  ${choiceHelp}`);
   }
 
-  const choice = availableChoices.find((choiceValue) => choiceValue.value === choiceArg);
+  const choice = availableChoices.find(
+    (choiceValue) => choiceValue.value.toLowerCase() === choiceArg.toLowerCase(),
+  );
   if (choice == null) {
     throw new Error(`${choiceArg} is not a valid choice right now.  ${choiceHelp}`);
   }
@@ -118,7 +120,7 @@ export async function setAreaChoice(
   const choiceVariable = Object.values(area.variables).find(
     (variable) =>
       variable?.type === 'choice' &&
-      variable?.choices.find((choice) => choice.value === choiceValue),
+      variable?.choices.find((choice) => choice.value.toLowerCase() === choiceValue.toLowerCase()),
   );
 
   if (!choiceVariable) {
