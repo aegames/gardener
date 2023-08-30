@@ -41,7 +41,7 @@ const helpHandler: CommandHandler<any, any, any> = async (managedGuild, game, ms
   await msg.reply(
     `Available commands:\n${Object.keys(game.commandHandlers)
       .sort()
-      .map((commandName) => `!${commandName}`)
+      .map((commandName) => `.${commandName}`)
       .join('\n')}`,
   );
 };

@@ -208,16 +208,19 @@ export function setupClient(game: Game<any, any, any>) {
 
   client.on('message', async (msg) => {
     if (!msg.guild) {
+      logger.debug(`Ignoring message from no guild`);
       return;
     }
 
     const managedGuild = managedGuildsByGuildId.get(msg.guild.id);
     if (!managedGuild) {
+      logger.debug(`Ignoring message from unmanaged guild`);
       return;
     }
 
-    const match = msg.content.match(/^\!(\s*)(\w+)(\s+(.*))?$/);
+    const match = msg.content.match(/^[\.\!](\s*)(\w+)(\s+(.*))?$/);
     if (!match) {
+      logger.debug(`Ignoring non-command message`);
       return;
     }
 
